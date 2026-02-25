@@ -66,7 +66,9 @@ func (s *Server) MountRoutes() {
 	r.Use(middleware.RequestID)         // 1. Generate request ID
 	r.Use(middleware.Logger)            // 2. Log requests/responses
 	r.Use(middleware.ErrorHandler)      // 3. Recover from panics
-	r.Use(middleware.RateLimit(10, 20)) // 4. Global Rate Limit (10 req/s, 20 burst)
+	// NOTE: All GIKI campus users share one NAT IP. Limits cover ALL users at once.
+	// 800 users x ~4 concurrent requests = ~3200 burst at peak.
+	r.Use(middleware.RateLimit(1000, 5000)) // 4. Global Rate Limit (1000 req/s, 5000 burst)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -78,14 +80,14 @@ func (s *Server) MountRoutes() {
 
 	r.Post("/auth/register", s.User.HandlerRegister)
 
-	// Strict Rate Limit for Login: 1 req/s, 5 burst.
-	r.With(middleware.RateLimit(1, 5)).Post("/auth/signin", s.Auth.Login)
+	// Login rate limit: raised for campus NAT (all users share one IP).
+	r.With(middleware.RateLimit(50, 200)).Post("/auth/signin", s.Auth.Login)
 
 	r.Post("/auth/refresh", s.Auth.RefreshToken)
 	r.Post("/auth/signout", s.Auth.Logout)
 	r.Get("/auth/verify", s.Auth.VerifyEmail)
-	r.With(middleware.RateLimit(1, 3)).Post("/auth/forgot-password", s.Auth.ForgotPassword)
-	r.With(middleware.RateLimit(1, 3)).Post("/auth/reset-password", s.Auth.ResetPassword)
+	r.With(middleware.RateLimit(10, 50)).Post("/auth/forgot-password", s.Auth.ForgotPassword)
+	r.With(middleware.RateLimit(10, 50)).Post("/auth/reset-password", s.Auth.ResetPassword)
 	r.With(s.Auth.Authenticate).Get("/auth/me", s.Auth.Me)
 	r.With(s.Auth.Authenticate).Get("/auth/me", s.Auth.Me)
 

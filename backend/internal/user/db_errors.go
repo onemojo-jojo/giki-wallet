@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"fmt"
 
 	commonerrors "github.com/hash-walker/giki-wallet/internal/common/errors"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,7 +19,6 @@ func translateDBError(err error) error {
 	}
 
 	if pgErr.Code == "23505" {
-
 		switch pgErr.ConstraintName {
 		case "uq_users_email":
 			return ErrDuplicateEmail
@@ -27,10 +27,12 @@ func translateDBError(err error) error {
 		case "uq_users_reg_number":
 			return ErrDuplicateRegID
 		default:
+			fmt.Printf("ERROR: Unknown unique constraint violation: %s\n", pgErr.ConstraintName)
 			return commonerrors.Wrap(ErrUserCreationFailed, err)
 		}
 	}
 
 	// Default to generic error
+	fmt.Printf("ERROR: Unknown database error: %s (Code: %s)\n", pgErr.Message, pgErr.Code)
 	return commonerrors.Wrap(ErrUserCreationFailed, err)
 }

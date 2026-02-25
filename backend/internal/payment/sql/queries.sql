@@ -175,3 +175,31 @@ SELECT
 FROM giki_wallet.gateway_transactions gt
 JOIN giki_wallet.users u ON gt.user_id = u.id
 WHERE gt.txn_ref_no = $1;
+
+-- name: GetStalePendingTransactions :many
+-- Fetch PENDING/UNKNOWN transactions between 3 minutes and 24 hours old,
+-- not currently being polled, and not already having a pending RECONCILE_PAYMENT job.
+SELECT gt.* FROM giki_wallet.gateway_transactions gt
+WHERE gt.status IN ('PENDING', 'UNKNOWN')
+  AND gt.is_polling = FALSE
+  AND gt.created_at < NOW() - INTERVAL '3 minutes'
+  AND gt.created_at > NOW() - INTERVAL '24 hours'
+  AND NOT EXISTS (
+    SELECT 1 FROM giki_wallet.jobs j
+    WHERE j.job_type = 'RECONCILE_PAYMENT'
+      AND j.status = 'PENDING'
+      AND j.payload::jsonb->>'txn_ref_no' = gt.txn_ref_no
+  )
+ORDER BY gt.created_at ASC;
+
+-- name: AutoFailStalePendingTransactions :exec
+-- Mark transactions older than 24 hours that are still PENDING/UNKNOWN as FAILED.
+-- These are permanently abandoned payments that will never resolve.
+UPDATE giki_wallet.gateway_transactions
+SET status = 'FAILED',
+    gateway_message = 'Automatically failed: payment abandoned after 24 hours',
+    gateway_status_code = 'AUTO_FAILED',
+    updated_at = NOW()
+WHERE status IN ('PENDING', 'UNKNOWN')
+  AND is_polling = FALSE
+  AND created_at < NOW() - INTERVAL '24 hours';

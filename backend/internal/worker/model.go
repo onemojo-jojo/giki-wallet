@@ -59,3 +59,9 @@ type TicketCancelledPayload struct {
 	RefundAmount int    `json:"refund_amount"`
 	Reason       string `json:"reason"`
 }
+
+type ReconcilePaymentPayload struct {
+	TxnRefNo string `json:"txn_ref_no"`
+	Attempt  int    `json:"attempt"`
+}
+

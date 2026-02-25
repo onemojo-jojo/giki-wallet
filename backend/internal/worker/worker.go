@@ -15,11 +15,14 @@ import (
 )
 
 type JobWorker struct {
-	q             *worker.Queries
-	dbPool        *pgxpool.Pool
-	mailer        *mailer.GraphSender
-	lastHeartbeat time.Time
+	q              *worker.Queries
+	dbPool         *pgxpool.Pool
+	mailer         *mailer.GraphSender
+	lastHeartbeat  time.Time
+	reconcileFunc  func(ctx context.Context, txnRefNo string, attempt int) error
+	staleFetcher   func(ctx context.Context) []string
 }
+
 func NewWorker(dbPool *pgxpool.Pool, mailer *mailer.GraphSender) *JobWorker {
 	return &JobWorker{
 		q:             worker.New(dbPool),
@@ -27,6 +30,16 @@ func NewWorker(dbPool *pgxpool.Pool, mailer *mailer.GraphSender) *JobWorker {
 		mailer:        mailer,
 		lastHeartbeat: time.Now(),
 	}
+}
+
+// SetReconciler wires the payment reconciliation callback to avoid circular imports.
+func (w *JobWorker) SetReconciler(fn func(ctx context.Context, txnRefNo string, attempt int) error) {
+	w.reconcileFunc = fn
+}
+
+// SetStaleFetcher wires a function that returns TxnRefNo strings for stale pending transactions.
+func (w *JobWorker) SetStaleFetcher(fn func(ctx context.Context) []string) {
+	w.staleFetcher = fn
 }
 
 func (w *JobWorker) Enqueue(ctx context.Context, jobType string, payload interface{}) error {
@@ -75,8 +88,10 @@ func (w *JobWorker) StartJobTicker(ctx context.Context, workerCount int) {
 func (w *JobWorker) StartStatusTicker(ctx context.Context) {
 	ticker := time.NewTicker(1 * time.Minute)
 	pruneTicker := time.NewTicker(1 * time.Hour)
+	reconcileTicker := time.NewTicker(3 * time.Minute)
 	defer ticker.Stop()
 	defer pruneTicker.Stop()
+	defer reconcileTicker.Stop()
 
 	for {
 		select {
@@ -99,9 +114,38 @@ func (w *JobWorker) StartStatusTicker(ctx context.Context) {
 			if err := w.q.PruneExpiredTokens(ctx); err != nil {
 				middleware.LogAppError(err, "Error pruning tokens")
 			}
+		case <-reconcileTicker.C:
+			w.runReconciliationSweep(ctx)
 		}
 	}
 }
+
+func (w *JobWorker) runReconciliationSweep(ctx context.Context) {
+	if w.reconcileFunc == nil || w.staleFetcher == nil {
+		// Not wired yet — skip.
+		return
+	}
+
+	stale := w.staleFetcher(ctx)
+	if len(stale) == 0 {
+		return
+	}
+
+	log.Printf("[reconciliation] Found %d stale pending transaction(s) — enqueuing jobs", len(stale))
+
+	for _, txnRefNo := range stale {
+		payload := ReconcilePaymentPayload{
+			TxnRefNo: txnRefNo,
+			Attempt:  1,
+		}
+		if err := w.Enqueue(ctx, "RECONCILE_PAYMENT", payload); err != nil {
+			middleware.LogAppError(err, "[reconciliation] Failed to enqueue job for "+txnRefNo)
+		} else {
+			log.Printf("[reconciliation] Enqueued RECONCILE_PAYMENT for %s", txnRefNo)
+		}
+	}
+}
+
 
 func (w *JobWorker) processNextJob(ctx context.Context) {
 	job, err := w.q.FetchNextJob(ctx)
@@ -128,6 +172,8 @@ func (w *JobWorker) processNextJob(ctx context.Context) {
 		processErr = w.handleAccountCreated(job.Payload)
 	case "SEND_PASSWORD_RESET_EMAIL":
 		processErr = w.handlePasswordReset(job.Payload)
+	case "RECONCILE_PAYMENT":
+		processErr = w.handlePaymentReconciliation(ctx, job.Payload)
 	default:
 		log.Printf("Unknown job type: %s", job.JobType)
 		processErr = fmt.Errorf("unknown job type")
@@ -141,6 +187,20 @@ func (w *JobWorker) processNextJob(ctx context.Context) {
 	} else {
 		w.q.CompleteJob(ctx, job.ID)
 	}
+}
+
+func (w *JobWorker) handlePaymentReconciliation(ctx context.Context, payload json.RawMessage) error {
+	var data ReconcilePaymentPayload
+	if err := json.Unmarshal(payload, &data); err != nil {
+		return fmt.Errorf("failed to unmarshal reconcile payload: %w", err)
+	}
+
+	if w.reconcileFunc == nil {
+		return fmt.Errorf("reconcile function not set")
+	}
+
+	log.Printf("[reconciliation] Processing RECONCILE_PAYMENT for %s (attempt %d)", data.TxnRefNo, data.Attempt)
+	return w.reconcileFunc(ctx, data.TxnRefNo, data.Attempt)
 }
 
 func (w *JobWorker) handleStudentVerification(payload json.RawMessage) error {

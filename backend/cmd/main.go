@@ -100,10 +100,15 @@ func main() {
 	auditHandler := audit.NewHandler(auditService)
 	walletService := wallet.NewService(pool, cfg.Secrets.LedgerSecret)
 	walletHandler := wallet.NewHandler(walletService)
-	paymentService := payment.NewService(pool, jazzCashClient, walletService, inquiryRateLimiter, configService, cfg.Server.AppURL)
+	paymentService := payment.NewService(pool, jazzCashClient, walletService, inquiryRateLimiter, configService, cfg.Server.AppURL, newWorker)
 	paymentHandler := payment.NewHandler(paymentService, walletService)
 	transportService := transport.NewService(pool, walletService, newWorker, loc)
 	transportHandler := transport.NewHandler(transportService, auditService)
+
+	// Wire reconciliation callbacks (after both services are constructed)
+	newWorker.SetReconciler(paymentService.ReconcileTransaction)
+	newWorker.SetStaleFetcher(paymentService.StalePendingRefNos)
+
 
 	feedbackService := feedback.NewService(pool)
 	feedbackHandler := feedback.NewHandler(feedbackService)

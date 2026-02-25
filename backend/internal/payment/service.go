@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"time"
+
 
 	"github.com/google/uuid"
 	"github.com/hash-walker/giki-wallet/internal/auth"
@@ -39,6 +41,12 @@ type Service struct {
 	rateLimiter   *RateLimiter
 	configS       *config_management.Service
 	AppURL        string
+	workerS       workerEnqueuer
+}
+
+// workerEnqueuer is the minimal interface the payment service needs from the worker.
+type workerEnqueuer interface {
+	EnqueueIn(ctx context.Context, jobType string, payload interface{}, delay time.Duration) error
 }
 
 // RateLimiter limits concurrent API calls to external services
@@ -51,7 +59,7 @@ type RateLimiter struct {
 // =============================================================================
 
 // NewService creates a new payment service
-func NewService(dbPool *pgxpool.Pool, gatewayClient gateway.Gateway, walletS *wallet.Service, rateLimiter *RateLimiter, configS *config_management.Service, appURL string) *Service {
+func NewService(dbPool *pgxpool.Pool, gatewayClient gateway.Gateway, walletS *wallet.Service, rateLimiter *RateLimiter, configS *config_management.Service, appURL string, workerS workerEnqueuer) *Service {
 	return &Service{
 		q:             payment.New(dbPool),
 		dbPool:        dbPool,
@@ -60,6 +68,7 @@ func NewService(dbPool *pgxpool.Pool, gatewayClient gateway.Gateway, walletS *wa
 		rateLimiter:   rateLimiter,
 		configS:       configS,
 		AppURL:        appURL,
+		workerS:       workerS,
 	}
 }
 
@@ -959,4 +968,93 @@ func (s *Service) GetTransactionAuditLogs(ctx context.Context, txnRefNo string) 
 		return []payment.GikiWalletPaymentAuditLog{}, nil
 	}
 	return logs, nil
+}
+
+// =============================================================================
+// RECONCILIATION METHODS
+// =============================================================================
+
+// StalePendingRefNos returns the TxnRefNo of all stale PENDING/UNKNOWN transactions.
+// This is called by the worker's 5-minute sweep to decide what to enqueue.
+func (s *Service) StalePendingRefNos(ctx context.Context) []string {
+	// First: auto-fail any transactions older than 24h — they are permanently abandoned.
+	if err := s.q.AutoFailStalePendingTransactions(ctx); err != nil {
+		middleware.LogAppError(fmt.Errorf("[reconciliation] AutoFailStalePendingTransactions failed: %w", err), "reconciliation-autofail")
+	}
+
+	txns, err := s.q.GetStalePendingTransactions(ctx)
+	if err != nil {
+		middleware.LogAppError(fmt.Errorf("[reconciliation] GetStalePendingTransactions failed: %w", err), "reconciliation-sweep")
+		return nil
+	}
+
+	refs := make([]string, 0, len(txns))
+	for _, t := range txns {
+		refs = append(refs, t.TxnRefNo)
+	}
+	return refs
+}
+
+
+// ReconcileTransaction is called by the worker for each RECONCILE_PAYMENT job.
+// It performs the same status check as the admin "Verify" button.
+// If still PENDING, it re-enqueues with a 5-minute delay (up to 3 attempts).
+// On attempt 3, it leaves the transaction for manual admin review.
+func (s *Service) ReconcileTransaction(ctx context.Context, txnRefNo string, attempt int) error {
+	const maxAttempts = 3
+
+	txn, err := s.q.GetTransactionByTxnRefNo(ctx, txnRefNo)
+	if err != nil {
+		return fmt.Errorf("[reconciliation] GetTransactionByTxnRefNo failed for %s: %w", txnRefNo, err)
+	}
+
+	// Already resolved — nothing to do
+	if txn.Status == payment.CurrentStatusSUCCESS || txn.Status == payment.CurrentStatusFAILED {
+		log.Printf("[reconciliation] %s is already terminal (%s), skipping", txnRefNo, txn.Status)
+		return nil
+	}
+
+	// Query JazzCash and finalize (credits wallet if SUCCESS)
+	_, checkErr := s.checkTransactionStatus(ctx, txn)
+	if checkErr != nil {
+		// Gateway error — re-enqueue if retries remain
+		if attempt < maxAttempts && s.workerS != nil {
+			log.Printf("[reconciliation] %s gateway error (attempt %d), will retry: %v", txnRefNo, attempt, checkErr)
+			return s.workerS.EnqueueIn(ctx, "RECONCILE_PAYMENT", ReconcilePaymentRef{
+				TxnRefNo: txnRefNo,
+				Attempt:  attempt + 1,
+			}, 3*time.Minute)
+		}
+		log.Printf("[reconciliation] %s exhausted retries, leaving for admin", txnRefNo)
+		return nil
+	}
+
+	// Re-check DB status after the call
+	updated, err := s.q.GetTransactionByTxnRefNo(ctx, txnRefNo)
+	if err != nil {
+		return nil // best-effort
+	}
+
+	if updated.Status == payment.CurrentStatusSUCCESS || updated.Status == payment.CurrentStatusFAILED {
+		log.Printf("[reconciliation] %s resolved to %s ✓", txnRefNo, updated.Status)
+		return nil
+	}
+
+	// Still pending — retry or give up
+	if attempt < maxAttempts && s.workerS != nil {
+		log.Printf("[reconciliation] %s still PENDING (attempt %d/%d), re-enqueueing in 3m", txnRefNo, attempt, maxAttempts)
+		return s.workerS.EnqueueIn(ctx, "RECONCILE_PAYMENT", ReconcilePaymentRef{
+			TxnRefNo: txnRefNo,
+			Attempt:  attempt + 1,
+		}, 3*time.Minute)
+	}
+
+	log.Printf("[reconciliation] %s still PENDING after %d attempts — leaving for admin", txnRefNo, maxAttempts)
+	return nil
+}
+
+// ReconcilePaymentRef is the minimal payload for re-enqueuing a reconciliation job.
+type ReconcilePaymentRef struct {
+	TxnRefNo string `json:"txn_ref_no"`
+	Attempt  int    `json:"attempt"`
 }

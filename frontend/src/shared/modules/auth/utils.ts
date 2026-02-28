@@ -3,7 +3,7 @@ export type AuthUserType = 'STUDENT' | 'EMPLOYEE';
 export function extractStudentRegIdFromEmail(email: string): string | null {
     const normalized = email.trim().toLowerCase();
     // Match (u|gcs|gcv|gee|gem|ges) followed by digits
-    const match = normalized.match(/^(?:u|ges|gcs|gcv|gee|gem)(\d+)@giki\.edu\.pk$/);
+    const match = normalized.match(/^(?:u|ges|gcm|gcs|gcv|gee|gem|gmm)(\d+)@giki\.edu\.pk$/);
     return match?.[1] ?? null;
 }
 

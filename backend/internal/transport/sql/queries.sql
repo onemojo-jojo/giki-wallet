@@ -325,17 +325,29 @@ SELECT
     ti.ticket_code,
     ti.passenger_name,
     u.phone_number as user_phone_number,
+    u.email as user_email,
     s.address as stop_name,
-    ts.sequence_order as stop_sequence
+    COALESCE(ts.sequence_order, 999) as stop_sequence
 FROM giki_transport.trip t
 JOIN giki_transport.routes r ON t.route_id = r.id
-JOIN giki_transport.tickets ti ON t.id = ti.trip_id
+JOIN giki_transport.tickets ti ON t.id = ti.trip_id AND ti.status = 'CONFIRMED'
 JOIN giki_transport.stops s ON ti.pickup_stop_id = s.id
 JOIN giki_wallet.users u ON ti.user_id = u.id
-JOIN giki_transport.trip_stops ts ON (t.id = ts.trip_id AND s.id = ts.stop_id)
+LEFT JOIN giki_transport.trip_stops ts ON (t.id = ts.trip_id AND s.id = ts.stop_id)
 WHERE t.id = ANY($1::uuid[])
-  AND ti.status = 'CONFIRMED'
-ORDER BY t.id, ts.sequence_order, ti.serial_no;
+ORDER BY t.id, COALESCE(ts.sequence_order, 999), ti.serial_no;
+
+-- name: GetTripInfoForExport :many
+SELECT
+    t.id as trip_id,
+    r.name as route_name,
+    t.departure_time,
+    t.bus_type,
+    t.direction
+FROM giki_transport.trip t
+JOIN giki_transport.routes r ON t.route_id = r.id
+WHERE t.id = ANY($1::uuid[])
+ORDER BY t.departure_time;
 
 
 -- name: GetTicketsForAdmin :many

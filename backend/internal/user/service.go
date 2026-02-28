@@ -212,7 +212,7 @@ func (s *Service) validateRegistration(req RegisterRequest) error {
 
 	// Prevent students from signing up as employees
 	// Support patterns: uXXXX, gcsXXXX, gcvXXXX, geeXXXX, gemXXXX
-	studentPattern := regexp.MustCompile(`^(u|gcs|ges|gcv|gee|gem)[0-9]+@giki\.edu\.pk$`)
+	studentPattern := regexp.MustCompile(`^(u|gcm|gcs|ges|gcv|gee|gem|gmm)[0-9]+@giki\.edu\.pk$`)
 	if userType == auth.RoleEmployee && studentPattern.MatchString(strings.ToLower(req.Email)) {
 		return ErrStudentEmailAsEmployee
 	}

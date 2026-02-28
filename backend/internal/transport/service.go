@@ -758,7 +758,14 @@ func (s *Service) GetRevenueTransactions(ctx context.Context, page, pageSize int
 	return s.wallet.GetWalletHistory(ctx, revenueWalletID, page, pageSize)
 }
 func (s *Service) ExportTripData(ctx context.Context, tripIDs []uuid.UUID) ([]byte, error) {
+	// 1. Get all ticket rows (only trips WITH confirmed tickets will appear here)
 	rows, err := s.q.GetTripsForExport(ctx, tripIDs)
+	if err != nil {
+		return nil, commonerrors.Wrap(commonerrors.ErrDatabase, err)
+	}
+
+	// 2. Get trip info for ALL requested trips (including those with zero tickets)
+	allTrips, err := s.q.GetTripInfoForExport(ctx, tripIDs)
 	if err != nil {
 		return nil, commonerrors.Wrap(commonerrors.ErrDatabase, err)
 	}
@@ -775,40 +782,52 @@ func (s *Service) ExportTripData(ctx context.Context, tripIDs []uuid.UUID) ([]by
 	trips := make(map[uuid.UUID]*TripGroup)
 	var tripOrder []*TripGroup
 
+	// 3. Seed all trips from the info query (guarantees every selected trip is included)
+	for _, info := range allTrips {
+		tg := &TripGroup{
+			TripID:        info.TripID,
+			RouteName:     info.RouteName,
+			DepartureTime: info.DepartureTime,
+			BusType:       info.BusType,
+			Direction:     info.Direction,
+			Tickets:       []transport_db.GetTripsForExportRow{},
+		}
+		trips[info.TripID] = tg
+		tripOrder = append(tripOrder, tg)
+	}
+
+	// 4. Attach ticket rows to their trip groups
 	for _, row := range rows {
 		tg, exists := trips[row.TripID]
 		if !exists {
-			tg = &TripGroup{
-				TripID:        row.TripID,
-				RouteName:     row.RouteName,
-				DepartureTime: row.DepartureTime,
-				BusType:       row.BusType,
-				Direction:     row.Direction,
-				Tickets:       []transport_db.GetTripsForExportRow{},
-			}
-			trips[row.TripID] = tg
-			tripOrder = append(tripOrder, tg)
+			continue // shouldn't happen, but defensive
 		}
 		tg.Tickets = append(tg.Tickets, row)
 	}
 
-	// Create ZIP buffer
+	// 5. Create ZIP buffer
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
 
 	for _, tg := range tripOrder {
 		safeRouteName := strings.ReplaceAll(tg.RouteName, " ", "_")
 		safeRouteName = strings.ReplaceAll(safeRouteName, "/", "-")
-		filename := fmt.Sprintf("%s_%s.csv", safeRouteName, tg.DepartureTime.In(s.loc).Format("20060102_1504"))
+		filename := fmt.Sprintf("%s_%s_%s_%s.csv", safeRouteName, tg.Direction, tg.BusType, tg.DepartureTime.In(s.loc).Format("20060102_1504"))
 
-		f, err := zipWriter.Create(filename)
+		// FIX: Use CreateHeader with proper Modified time (fixes 1979 date bug)
+		header := &zip.FileHeader{
+			Name:     filename,
+			Method:   zip.Deflate,
+			Modified: tg.DepartureTime,
+		}
+		f, err := zipWriter.CreateHeader(header)
 		if err != nil {
 			return nil, commonerrors.Wrap(commonerrors.ErrInternal, err)
 		}
 
 		w := csv.NewWriter(f)
 
-		// 1. Header Info
+		// Header Info
 		_ = w.Write([]string{"GIKI TRANSPORT - TRIP MANIFEST"})
 		_ = w.Write([]string{"Route", tg.RouteName})
 		_ = w.Write([]string{"Bus", tg.BusType})
@@ -817,33 +836,37 @@ func (s *Service) ExportTripData(ctx context.Context, tripIDs []uuid.UUID) ([]by
 		_ = w.Write([]string{"Total Passengers", strconv.Itoa(len(tg.Tickets))})
 		_ = w.Write([]string{}) // Empty row
 
-		// Pre-calculate counts per stop
-		stopCounts := make(map[string]int)
-		for _, t := range tg.Tickets {
-			stopCounts[t.StopName]++
-		}
-
-		// 2. Group by Stops
-		currentStop := ""
-		for _, ticket := range tg.Tickets {
-			// If new stop, print stop header
-			if ticket.StopName != currentStop {
-				if currentStop != "" {
-					_ = w.Write([]string{})
-				}
-				currentStop = ticket.StopName
-				count := stopCounts[currentStop]
-				// _ = w.Write([]string{"--- STOP: " + strings.ToUpper(currentStop) + " ---"})
-				_ = w.Write([]string{"STOP: " + strings.ToUpper(currentStop), "TOTAL: " + strconv.Itoa(count)})
-				_ = w.Write([]string{"Serial", "Ticket Code", "Passenger Name", "Mobile Number"})
+		if len(tg.Tickets) == 0 {
+			_ = w.Write([]string{"No confirmed passengers for this trip."})
+		} else {
+			// Pre-calculate counts per stop
+			stopCounts := make(map[string]int)
+			for _, t := range tg.Tickets {
+				stopCounts[t.StopName]++
 			}
 
-			_ = w.Write([]string{
-				strconv.Itoa(int(ticket.SerialNo)),
-				ticket.TicketCode,
-				ticket.PassengerName,
-				ticket.UserPhoneNumber,
-			})
+			// Group by Stops
+			currentStop := ""
+			for _, ticket := range tg.Tickets {
+				// If new stop, print stop header
+				if ticket.StopName != currentStop {
+					if currentStop != "" {
+						_ = w.Write([]string{})
+					}
+					currentStop = ticket.StopName
+					count := stopCounts[currentStop]
+					_ = w.Write([]string{"STOP: " + strings.ToUpper(currentStop), "TOTAL: " + strconv.Itoa(count)})
+					_ = w.Write([]string{"Serial", "Ticket Code", "Passenger Name", "Mobile Number", "Email"})
+				}
+
+				_ = w.Write([]string{
+					strconv.Itoa(int(ticket.SerialNo)),
+					ticket.TicketCode,
+					ticket.PassengerName,
+					ticket.UserPhoneNumber,
+					ticket.UserEmail,
+				})
+			}
 		}
 
 		w.Flush()

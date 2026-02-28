@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -195,6 +196,7 @@ func (h *Handler) HandleExportTrips(w http.ResponseWriter, r *http.Request) {
 	filename := fmt.Sprintf("trip_manifests_%s.zip", time.Now().Format("20060102"))
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(zipBytes)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(zipBytes)
 }

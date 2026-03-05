@@ -66,3 +66,56 @@ jobs:
             ${{ env.IMAGE_PREFIX }}-frontend:latest
             ${{ env.IMAGE_PREFIX }}-frontend:${{ github.sha }}
 
+  build-nginx:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push nginx
+        uses: docker/build-push-action@v6
+        with:
+          context: ./infrastructure/nginx
+          file: ./infrastructure/nginx/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-nginx:latest
+            ${{ env.IMAGE_PREFIX }}-nginx:${{ github.sha }}
+
+  build-migrations:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push migrations
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/sql
+          file: ./backend/sql/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-migrations:latest
+            ${{ env.IMAGE_PREFIX }}-migrations:${{ github.sha }}

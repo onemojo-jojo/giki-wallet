@@ -5,26 +5,37 @@
 set -euo pipefail
 
 PROJECT_DIR="/opt_2/giki-wallet"
-BACKEND_IMAGE="ghcr.io/hash-walker/giki-wallet-backend:latest"
-FRONTEND_IMAGE="ghcr.io/hash-walker/giki-wallet-frontend:latest"
+IMAGES=(
+  "ghcr.io/hash-walker/giki-wallet-backend:latest"
+  "ghcr.io/hash-walker/giki-wallet-frontend:latest"
+  "ghcr.io/hash-walker/giki-wallet-nginx:latest"
+  "ghcr.io/hash-walker/giki-wallet-migrations:latest"
+)
 
 cd "$PROJECT_DIR"
 
-# Get current image digests
-OLD_BACKEND=$(docker inspect --format='{{index .RepoDigests 0}}' "$BACKEND_IMAGE" 2>/dev/null || echo "none")
-OLD_FRONTEND=$(docker inspect --format='{{index .RepoDigests 0}}' "$FRONTEND_IMAGE" 2>/dev/null || echo "none")
+# Capture current digests
+declare -A OLD_DIGESTS
+for img in "${IMAGES[@]}"; do
+  OLD_DIGESTS["$img"]=$(docker inspect --format='{{index .RepoDigests 0}}' "$img" 2>/dev/null || echo "none")
+done
 
-# Pull latest
-docker compose pull backend frontend --quiet
+# Pull all images
+docker compose pull --quiet
 
-# Get new digests
-NEW_BACKEND=$(docker inspect --format='{{index .RepoDigests 0}}' "$BACKEND_IMAGE" 2>/dev/null || echo "none")
-NEW_FRONTEND=$(docker inspect --format='{{index .RepoDigests 0}}' "$FRONTEND_IMAGE" 2>/dev/null || echo "none")
+# Check if anything changed
+CHANGED=false
+for img in "${IMAGES[@]}"; do
+  NEW=$(docker inspect --format='{{index .RepoDigests 0}}' "$img" 2>/dev/null || echo "none")
+  if [ "${OLD_DIGESTS[$img]}" != "$NEW" ]; then
+    CHANGED=true
+    break
+  fi
+done
 
-# Only restart if something changed
-if [ "$OLD_BACKEND" != "$NEW_BACKEND" ] || [ "$OLD_FRONTEND" != "$NEW_FRONTEND" ]; then
+if [ "$CHANGED" = true ]; then
     echo "[$(date)] New images detected, deploying..."
-    docker compose up -d --no-deps backend frontend
+    docker compose up -d --no-deps backend frontend migrations
     docker compose restart nginx
     docker image prune -f
     echo "[$(date)] Deploy complete."

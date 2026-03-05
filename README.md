@@ -97,3 +97,6 @@ The project adheres to several key principles to maintain codebase health:
 1.  **Strict Domain Isolation:** Cross-module communication is restricted to defined service interfaces.
 2.  **Schema Enforcement:** Foreign keys across schemas are minimized to facilitate future decoupling.
 3.  **Type Safety:** Ensuring consistency from SQL schemas to frontend interfaces.
+
+Copyright
+

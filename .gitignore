@@ -41,6 +41,7 @@ db.sql
 schema.sql
 *.dump
 *.sql.bak
+*.sql.gz
 
 # IDE
 .idea/
@@ -77,3 +78,7 @@ backend/main
 # Local TLS certs/keys (never commit)
 certs/
 
+
+# Deploy keys
+deploy_key
+deploy_key.pub

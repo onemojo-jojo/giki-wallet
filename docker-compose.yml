@@ -42,9 +42,7 @@ services:
       - ./backend/sql/schema:/migrations:ro
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/hash-walker/giki-wallet-backend:latest
     container_name: giki_wallet_backend
     restart: always
     depends_on:
@@ -103,11 +101,7 @@ services:
           memory: 1G
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=${VITE_API_URL:-/api}
+    image: ghcr.io/hash-walker/giki-wallet-frontend:latest
     container_name: giki_wallet_frontend
     restart: always
     volumes:

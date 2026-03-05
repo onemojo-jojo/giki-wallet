@@ -25,6 +25,7 @@ NEW_FRONTEND=$(docker inspect --format='{{index .RepoDigests 0}}' "$FRONTEND_IMA
 if [ "$OLD_BACKEND" != "$NEW_BACKEND" ] || [ "$OLD_FRONTEND" != "$NEW_FRONTEND" ]; then
     echo "[$(date)] New images detected, deploying..."
     docker compose up -d --no-deps backend frontend
+    docker compose restart nginx
     docker image prune -f
     echo "[$(date)] Deploy complete."
 else

@@ -132,6 +132,18 @@ export function isToGIKI(trip: Trip | undefined): boolean {
     return trip.direction.toUpperCase() === 'INBOUND';
 }
 
+/**
+ * Extract just the city name from a route name.
+ * "GIKI to Islamabad" → "Islamabad"
+ * "Rawalpindi to GIKI" → "Rawalpindi"
+ */
+export function getCityName(routeName: string): string {
+    const lower = routeName.toLowerCase();
+    if (lower.startsWith('giki to ')) return routeName.slice('giki to '.length);
+    if (lower.endsWith(' to giki')) return routeName.slice(0, routeName.length - ' to giki'.length);
+    return routeName;
+}
+
 // ============================================================================
 // BOOKING SELECTION HELPERS
 // ============================================================================

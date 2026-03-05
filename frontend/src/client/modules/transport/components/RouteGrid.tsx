@@ -15,30 +15,30 @@ interface RouteGridProps {
 export const RouteGrid = ({ direction, onBook }: RouteGridProps) => {
     const { user } = useAuthStore();
     const { allTrips, activeHolds, quota, isRoundTrip } = useTransportStore();
-    
+
     const isStudent = user?.user_type === 'STUDENT';
 
     // Group trips by route
     const routeGroups = useMemo(() => {
         const groups = new Map<string, { routeName: string; routeId: string; trips: Trip[] }>();
-        
+
         // STRICT filtering: direction AND exclude cancelled/deleted trips
         const targetDirection = direction.toUpperCase().trim();
-        
+
         allTrips
             .filter(trip => {
                 const tripDirection = trip.direction.toUpperCase().trim();
                 const tripStatus = trip.status.toUpperCase().trim();
-                
+
                 // Only show trips matching direction AND not cancelled/deleted
-                return tripDirection === targetDirection 
-                    && tripStatus !== 'CANCELLED' 
+                return tripDirection === targetDirection
+                    && tripStatus !== 'CANCELLED'
                     && tripStatus !== 'DELETED';
             })
             .forEach(trip => {
                 // Use composite key: route_id + direction to prevent mixing
                 const key = `${trip.route_id}_${trip.direction}`;
-                
+
                 if (!groups.has(key)) {
                     groups.set(key, {
                         routeName: trip.route_name,
@@ -51,7 +51,7 @@ export const RouteGrid = ({ direction, onBook }: RouteGridProps) => {
 
         // Sort trips by departure time within each route
         groups.forEach(group => {
-            group.trips.sort((a, b) => 
+            group.trips.sort((a, b) =>
                 new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime()
             );
         });
@@ -82,7 +82,7 @@ export const RouteGrid = ({ direction, onBook }: RouteGridProps) => {
         onBook?.(payload);
     };
 
-    const directionQuota = direction === 'OUTBOUND' 
+    const directionQuota = direction === 'OUTBOUND'
         ? (quota?.outbound ?? null)
         : (quota?.inbound ?? null);
 
@@ -110,6 +110,7 @@ export const RouteGrid = ({ direction, onBook }: RouteGridProps) => {
                     quota={directionQuota}
                     isRoundTrip={isRoundTrip}
                     onBook={handleBook}
+                    defaultExpanded={routeGroups.length === 1}
                 />
             ))}
         </div>

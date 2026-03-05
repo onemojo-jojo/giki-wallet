@@ -1,0 +1,287 @@
+// GIKI Wallet Database Schema
+// dbdiagram.io format
+// Copy and paste this into https://dbdiagram.io to visualize
+
+// ============================================
+// IDENTITY & AUTHENTICATION SCHEMA (giki_wallet)
+// ============================================
+
+Table users {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(150) [not null]
+  email varchar(254) [not null, unique]
+  phone_number varchar(20) [not null, unique]
+  auth_provider varchar(20) [not null, default: 'Local']
+  external_id varchar(255)
+  password_hash varchar(500) [not null]
+  password_algo varchar(20) [not null, default: 'BCRYPT']
+  is_active boolean [not null, default: false]
+  is_verified boolean [not null, default: false]
+  user_type varchar(20) [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Root identity entity. Every actor maps to exactly one user.'
+}
+
+Table student_profiles {
+  user_id uuid [pk]
+  reg_id varchar(20) [not null, unique]
+  degree_program varchar(50)
+  batch_year integer
+  
+  Note: 'Student-specific metadata extending users table'
+}
+
+Table employee_profiles {
+  user_id uuid [pk]
+  employee_id varchar(50) [not null, unique, default: `gen_random_uuid()`]
+  designation varchar(100)
+  department varchar(100)
+  
+  Note: 'Employee-specific metadata extending users table'
+}
+
+Table access_tokens {
+  token_hash varchar(64) [pk]
+  user_id uuid [not null]
+  type varchar(20) [not null]
+  expires_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Short-lived tokens for email verification, password reset'
+}
+
+Table refresh_tokens {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  token_hash text [not null]
+  expires_at timestamp [not null]
+  revoked_at timestamp
+  replaced_by_token text
+  device_info varchar(255)
+  ip_address varchar(45)
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Long-lived session tokens with rotation and revocation support'
+}
+
+// ============================================
+// WALLET & PAYMENTS SCHEMA (giki_wallet)
+// ============================================
+
+Table wallets {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [unique]
+  name varchar(100)
+  type varchar(20) [default: 'PERSONAL']
+  status varchar(20) [not null, default: 'ACTIVE']
+  currency varchar(10) [not null, default: 'G-Bux']
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Each user owns exactly one wallet. Supports PERSONAL, SYS_REVENUE, SYS_LIABILITY types'
+}
+
+Table transactions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  type varchar(50) [not null]
+  reference_id varchar(100) [not null]
+  description text
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Transaction metadata. Unique constraint on (type, reference_id) prevents duplicates'
+}
+
+Table ledger {
+  id uuid [pk, default: `gen_random_uuid()`]
+  wallet_id uuid [not null]
+  amount bigint [not null]
+  balance_after bigint [not null]
+  transaction_id uuid [not null]
+  row_hash varchar(255) [not null]
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Immutable append-only ledger. Source of truth for balances. Double-entry accounting.'
+}
+
+Table gateway_transactions {
+  id uuid [pk, default: `gen_random_uuid()`]
+  user_id uuid [not null]
+  idempotency_key uuid [not null, unique]
+  bill_ref_id varchar(50) [not null]
+  txn_ref_no varchar(50) [not null, unique]
+  payment_method varchar(50) [not null]
+  gateway_rrn varchar(50)
+  status varchar [not null, default: 'PENDING']
+  amount bigint [not null]
+  raw_response jsonb
+  is_polling boolean [default: false]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Payment gateway integration tracking. Status: PENDING, SUCCESS, FAILED, UNKNOWN'
+}
+
+// ============================================
+// TRANSPORT SCHEMA (giki_transport)
+// ============================================
+
+Table stops {
+  id uuid [pk, default: `gen_random_uuid()`]
+  address varchar(100) [not null]
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Bus stop locations'
+}
+
+Table routes {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name text [not null]
+  origin_stop_id uuid [not null]
+  destination_stop_id uuid [not null]
+  is_active boolean [default: true]
+  default_booking_open_offset_hours integer [default: 48]
+  default_booking_close_offset_hours integer [default: 5]
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Defined routes between origin and destination stops'
+}
+
+Table route_master_stops {
+  id uuid [pk, default: `gen_random_uuid()`]
+  route_id uuid [not null]
+  stop_id uuid [not null]
+  default_sequence_order integer [not null]
+  is_default_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Stops included in each route with sequence order'
+}
+
+Table route_weekly_schedules {
+  id uuid [pk, default: `gen_random_uuid()`]
+  route_id uuid [not null]
+  day_of_week integer [not null]
+  departure_time time [not null]
+  created_at timestamptz [default: `now()`]
+  
+  Note: 'Recurring weekly schedules for routes. day_of_week: 1=Monday, 7=Sunday'
+}
+
+Table driver {
+  id uuid [pk, default: `gen_random_uuid()`]
+  name varchar(100) [not null]
+  phone_number varchar(15) [not null]
+  license_number varchar(50) [unique]
+  is_active boolean [default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Driver information'
+}
+
+Table trips {
+  id uuid [pk, default: `gen_random_uuid()`]
+  route_id uuid [not null]
+  driver_id uuid
+  departure_time timestamptz [not null]
+  booking_open_offset_hours integer [not null]
+  booking_close_offset_hours integer [not null]
+  direction varchar(10) [not null, default: 'OUTBOUND']
+  base_price integer [not null, default: 0]
+  bus_type varchar(50) [not null]
+  total_capacity integer [not null]
+  available_seats integer [not null]
+  status varchar(20) [default: 'SCHEDULED']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Individual trip instances. Direction: OUTBOUND (from GIKI) or INBOUND (to GIKI)'
+}
+
+Table trip_stops {
+  id uuid [pk, default: `gen_random_uuid()`]
+  trip_id uuid [not null]
+  stop_id uuid [not null]
+  sequence_order integer [not null]
+  created_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Stops visited by specific trips. Preserves historical route configuration'
+}
+
+Table tickets {
+  id uuid [pk, default: `gen_random_uuid()`]
+  trip_id uuid [not null]
+  user_id uuid [not null]
+  serial_no integer [not null]
+  ticket_code char(4) [not null]
+  pickup_stop_id uuid [not null]
+  dropoff_stop_id uuid [not null]
+  passenger_name varchar(100) [not null]
+  passenger_relation varchar(20) [not null]
+  price_paid integer [not null, default: 0]
+  status varchar(20) [not null, default: 'CONFIRMED']
+  booking_time timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  
+  Note: 'Confirmed ticket bookings. Unique constraints on (trip_id, serial_no) and (trip_id, ticket_code)'
+}
+
+Table trip_holds {
+  id uuid [pk, default: `gen_random_uuid()`]
+  trip_id uuid [not null]
+  user_id uuid [not null]
+  pickup_stop_id uuid [not null]
+  dropoff_stop_id uuid [not null]
+  passenger_name varchar(100)
+  passenger_relation varchar(20)
+  expires_at timestamptz [not null]
+  created_at timestamptz [default: `now()`]
+  
+  Note: 'Temporary reservations that expire after timeout. Prevents double-booking'
+}
+
+Table quota_rules {
+  user_role varchar(50) [pk]
+  direction varchar(10) [pk]
+  weekly_limit integer [not null, default: 1]
+  allow_dependent_booking boolean [not null, default: false]
+  
+  Note: 'Booking limits per user role (STUDENT/EMPLOYEE) and direction (OUTBOUND/INBOUND)'
+}
+
+// ============================================
+// RELATIONSHIPS
+// ============================================
+
+// Identity & Authentication
+Ref: student_profiles.user_id > users.id [delete: cascade]
+Ref: employee_profiles.user_id > users.id [delete: cascade]
+Ref: access_tokens.user_id > users.id [delete: cascade]
+Ref: refresh_tokens.user_id > users.id [delete: cascade]
+
+// Wallet & Payments
+Ref: wallets.user_id > users.id
+Ref: ledger.wallet_id > wallets.id
+Ref: ledger.transaction_id > transactions.id
+Ref: gateway_transactions.user_id > users.id [delete: cascade]
+
+// Transport - Core Structure
+Ref: routes.origin_stop_id > stops.id
+Ref: routes.destination_stop_id > stops.id
+Ref: route_master_stops.route_id > routes.id [delete: cascade]
+Ref: route_master_stops.stop_id > stops.id
+Ref: route_weekly_schedules.route_id > routes.id
+
+// Transport - Trips & Bookings
+Ref: trips.route_id > routes.id
+Ref: trips.driver_id > driver.id
+Ref: trip_stops.trip_id > trips.id [delete: cascade]
+Ref: trip_stops.stop_id > stops.id
+Ref: tickets.trip_id > trips.id
+Ref: tickets.user_id > users.id
+Ref: tickets.pickup_stop_id > stops.id
+Ref: tickets.dropoff_stop_id > stops.id
+Ref: trip_holds.trip_id > trips.id
+Ref: trip_holds.user_id > users.id

@@ -54,10 +54,6 @@ schema.sql
 .DS_Store
 Thumbs.db
 
-# Generated code (sqlc)
-# Exclude all generated files in *_db directories
-backend/internal/**/*_db/*.go
-!backend/internal/**/*_db/
 # Keep SQL migrations
 !backend/sql/migrations/
 

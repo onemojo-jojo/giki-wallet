@@ -291,8 +291,9 @@ func (s *Service) HoldSeats(ctx context.Context, userID uuid.UUID, userRole stri
 		}
 
 		usage, usageErr := qtx.GetWeeklyTicketCountByDirection(ctx, transport_db.GetWeeklyTicketCountByDirectionParams{
-			UserID:    userID,
-			Direction: trip.Direction,
+			UserID:        userID,
+			Direction:     trip.Direction,
+			ReferenceTime: trip.DepartureTime,
 		})
 
 		if usageErr != nil {
@@ -580,8 +581,9 @@ func (s *Service) GetUserQuota(ctx context.Context, userID uuid.UUID, userRole s
 
 		// 2. Get usage
 		usage, err := s.q.GetWeeklyTicketCountByDirection(ctx, transport_db.GetWeeklyTicketCountByDirectionParams{
-			UserID:    userID,
-			Direction: dir,
+			UserID:        userID,
+			Direction:     dir,
+			ReferenceTime: time.Now(),
 		})
 		if err != nil {
 			return nil, commonerrors.Wrap(commonerrors.ErrDatabase, err)

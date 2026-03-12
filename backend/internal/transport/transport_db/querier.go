@@ -56,7 +56,7 @@ type Querier interface {
 	GetTripsForWeekWithStops(ctx context.Context, arg GetTripsForWeekWithStopsParams) ([]GetTripsForWeekWithStopsRow, error)
 	GetUserEmailAndName(ctx context.Context, id uuid.UUID) (GetUserEmailAndNameRow, error)
 	GetUserTicketsByID(ctx context.Context, userID uuid.UUID) ([]GetUserTicketsByIDRow, error)
-	// Counts CONFIRMED tickets + ACTIVE HOLDS for the current calendar week (Mon-Sun) for a specific direction.
+	// Counts CONFIRMED tickets + ACTIVE HOLDS for the same calendar week (Mon-Sun) as the given reference time, for a specific direction.
 	GetWeeklyTicketCountByDirection(ctx context.Context, arg GetWeeklyTicketCountByDirectionParams) (int64, error)
 	GetWeeklyTicketStats(ctx context.Context, arg GetWeeklyTicketStatsParams) (GetWeeklyTicketStatsRow, error)
 	// =============================================

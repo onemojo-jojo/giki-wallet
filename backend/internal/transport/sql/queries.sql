@@ -154,29 +154,29 @@ WHERE user_role = $1 AND direction = $2;
 
 
 -- name: GetWeeklyTicketCountByDirection :one
--- Counts CONFIRMED tickets + ACTIVE HOLDS for the current calendar week (Mon-Sun) for a specific direction.
+-- Counts CONFIRMED tickets + ACTIVE HOLDS for the same calendar week (Mon-Sun) as the given reference time, for a specific direction.
 SELECT COUNT(*) FROM (
-       -- Part 1: Confirmed Tickets (trips departing this calendar week)
+       -- Part 1: Confirmed Tickets (trips departing in the same week as reference_time)
        SELECT t.id
        FROM giki_transport.tickets t
                 JOIN giki_transport.trip tr ON t.trip_id = tr.id
        WHERE t.user_id = sqlc.arg(user_id)
          AND t.status = 'CONFIRMED'
-         AND tr.departure_time >= date_trunc('week', NOW())
-         AND tr.departure_time <  date_trunc('week', NOW()) + INTERVAL '7 days'
+         AND tr.departure_time >= date_trunc('week', sqlc.arg(reference_time)::timestamptz)
+         AND tr.departure_time <  date_trunc('week', sqlc.arg(reference_time)::timestamptz) + INTERVAL '7 days'
          AND tr.direction = sqlc.arg(direction)
 
        UNION ALL
 
-       -- Part 2: Active Holds (for trips departing this calendar week)
+       -- Part 2: Active Holds (for trips departing in the same week as reference_time)
        SELECT h.id
        FROM giki_transport.trip_holds h
                 JOIN giki_transport.trip tr ON h.trip_id = tr.id
        WHERE h.user_id = sqlc.arg(user_id)
          AND tr.direction = sqlc.arg(direction)
          AND h.expires_at > NOW()
-         AND tr.departure_time >= date_trunc('week', NOW())
-         AND tr.departure_time <  date_trunc('week', NOW()) + INTERVAL '7 days'
+         AND tr.departure_time >= date_trunc('week', sqlc.arg(reference_time)::timestamptz)
+         AND tr.departure_time <  date_trunc('week', sqlc.arg(reference_time)::timestamptz) + INTERVAL '7 days'
 ) as total_count;
 
 

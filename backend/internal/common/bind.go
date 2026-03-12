@@ -70,7 +70,7 @@ func (d *DateRangeParams) Bind(r *http.Request) error {
 		}
 		d.EndDate = t
 	} else {
-		d.EndDate = d.StartDate.AddDate(0, 0, 7)
+		d.EndDate = d.StartDate.AddDate(0, 0, 14)
 	}
 
 	return nil

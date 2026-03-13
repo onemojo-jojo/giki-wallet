@@ -14,11 +14,29 @@ import (
 )
 
 // =============================================================================
+// HELPERS - Timezone (JazzCash expects PKT timestamps)
+// =============================================================================
+
+var pktLocation *time.Location
+
+func init() {
+	var err error
+	pktLocation, err = time.LoadLocation("Asia/Karachi")
+	if err != nil {
+		pktLocation = time.FixedZone("PKT", 5*60*60)
+	}
+}
+
+func NowPKT() time.Time {
+	return time.Now().In(pktLocation)
+}
+
+// =============================================================================
 // HELPERS - Reference Number Generation
 // =============================================================================
 
 func GenerateTxnRefNo() (string, error) {
-	timestamp := time.Now().Format("20060102150405")
+	timestamp := NowPKT().Format("20060102150405")
 	randBits, err := RandomBase32(4)
 	if err != nil {
 		return "", err
@@ -27,7 +45,7 @@ func GenerateTxnRefNo() (string, error) {
 }
 
 func GenerateBillRefNo() (string, error) {
-	timestamp := time.Now().Format("20060102150405")
+	timestamp := NowPKT().Format("20060102150405")
 	randBits, err := RandomBase32(4)
 	if err != nil {
 		return "", err

@@ -27,6 +27,7 @@ const (
 	FieldMerchantID        = "pp_MerchantID"
 	FieldPassword          = "pp_Password"
 	FieldAmount            = "pp_Amount"
+	FieldBankID            = "pp_BankID"
 	FieldBillReference     = "pp_BillReference"
 	FieldTxnRefNo          = "pp_TxnRefNo"
 	FieldDescription       = "pp_Description"
@@ -37,6 +38,13 @@ const (
 	FieldReturnURL         = "pp_ReturnURL"
 	FieldSecureHash        = "pp_SecureHash"
 	FieldTxnCurrency       = "pp_TxnCurrency"
+	FieldProductID         = "pp_ProductID"
+	FieldSubMerchantID     = "pp_SubMerchantID"
+	FieldMPF1              = "ppmpf_1"
+	FieldMPF2              = "ppmpf_2"
+	FieldMPF3              = "ppmpf_3"
+	FieldMPF4              = "ppmpf_4"
+	FieldMPF5              = "ppmpf_5"
 )
 
 // =============================================================================
@@ -338,18 +346,26 @@ func (c *JazzCashClient) verifyResponseHash(responseMap map[string]any) error {
 func (c *JazzCashClient) buildMWalletFields(req MWalletInitiateRequest) JazzCashFields {
 	fields := make(JazzCashFields)
 
+	fields[FieldAmount] = req.AmountPaisa
+	fields[FieldBankID] = ""
+	fields[FieldBillReference] = req.BillRefID
+	fields[FieldCNIC] = req.CNICLast6
+	fields[FieldDescription] = req.Description
 	fields[FieldLanguage] = "EN"
 	fields[FieldMerchantID] = c.merchantID
-	fields[FieldPassword] = c.password
-	fields[FieldAmount] = req.AmountPaisa
-	fields[FieldTxnCurrency] = "PKR"
-	fields[FieldBillReference] = req.BillRefID
-	fields[FieldTxnRefNo] = req.TxnRefNo
-	fields[FieldDescription] = req.Description
 	fields[FieldMobileNumber] = req.MobileNumber
-	fields[FieldCNIC] = req.CNICLast6
+	fields[FieldPassword] = c.password
+	fields[FieldProductID] = ""
+	fields[FieldSubMerchantID] = ""
+	fields[FieldTxnCurrency] = "PKR"
 	fields[FieldTxnDateTime] = req.TxnDateTime
 	fields[FieldTxnExpiryDateTime] = req.TxnExpiryDateTime
+	fields[FieldTxnRefNo] = req.TxnRefNo
+	fields[FieldMPF1] = ""
+	fields[FieldMPF2] = ""
+	fields[FieldMPF3] = ""
+	fields[FieldMPF4] = ""
+	fields[FieldMPF5] = ""
 
 	return fields
 }
@@ -363,14 +379,22 @@ func (c *JazzCashClient) buildCardFields(req CardInitiateRequest) JazzCashFields
 	fields[FieldLanguage] = "EN"
 	fields[FieldMerchantID] = c.merchantID
 	fields[FieldPassword] = c.password
+	fields[FieldTxnRefNo] = req.TxnRefNo
 	fields[FieldAmount] = req.AmountPaisa
 	fields[FieldTxnCurrency] = "PKR"
-	fields[FieldBillReference] = req.BillRefID
-	fields[FieldTxnRefNo] = req.TxnRefNo
-	fields[FieldDescription] = req.Description
-	fields[FieldReturnURL] = req.ReturnURL
 	fields[FieldTxnDateTime] = req.TxnDateTime
+	fields[FieldBillReference] = req.BillRefID
+	fields[FieldDescription] = req.Description
 	fields[FieldTxnExpiryDateTime] = req.TxnExpiryDateTime
+	fields[FieldReturnURL] = req.ReturnURL
+	fields[FieldSubMerchantID] = ""
+	fields[FieldBankID] = ""
+	fields[FieldProductID] = ""
+	fields[FieldMPF1] = ""
+	fields[FieldMPF2] = ""
+	fields[FieldMPF3] = ""
+	fields[FieldMPF4] = ""
+	fields[FieldMPF5] = ""
 
 	return fields
 }
@@ -554,6 +578,8 @@ func getUserFriendlyMessage(responseCode string) string {
 		return "Card has expired. Please use a valid card"
 	case "405":
 		return "Insufficient balance on card. Please check your card balance"
+	case "407":
+		return "Payment gateway encountered a temporary issue. Please try again in a few minutes"
 	case "419":
 		return "Card is not enrolled in 3D Secure. Please contact your bank to activate 3D Secure"
 

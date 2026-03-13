@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"strings"
 	"time"
 
 
@@ -335,8 +336,9 @@ func (s *Service) initiateMWalletPayment(
 		return nil, commonerrors.Wrap(ErrInvalidCNIC, err)
 	}
 
-	txnDateTime := time.Now().Format("20060102150405")
-	txnExpiryDateTime := time.Now().Add(24 * time.Hour).Format("20060102150405")
+	now := NowPKT()
+	txnDateTime := now.Format("20060102150405")
+	txnExpiryDateTime := now.Add(24 * time.Hour).Format("20060102150405")
 
 	mwRequest := gateway.MWalletInitiateRequest{
 		AmountPaisa:       AmountToPaisa(gatewayTxn.Amount),
@@ -371,9 +373,9 @@ func (s *Service) initiateCardPayment(
 		return "", fmt.Errorf("transaction is not pending")
 	}
 
-	// Build request
-	txnDateTime := time.Now().Format("20060102150405")
-	txnExpiryDateTime := time.Now().Add(24 * time.Hour).Format("20060102150405")
+	now := NowPKT()
+	txnDateTime := now.Format("20060102150405")
+	txnExpiryDateTime := now.Add(24 * time.Hour).Format("20060102150405")
 	returnURL := config.LoadConfig().Jazzcash.CardCallbackURL
 
 	cardRequest := gateway.CardInitiateRequest{
@@ -699,6 +701,11 @@ func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inqui
 // =============================================================================
 
 func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPostURL string) string {
+	var hiddenInputs strings.Builder
+	for k, v := range fields {
+		hiddenInputs.WriteString(fmt.Sprintf("\t\t\t\t\t<input type=\"hidden\" name=\"%s\" value=\"%s\">\n", k, v))
+	}
+
 	html := fmt.Sprintf(`
 		<!DOCTYPE html>
 		<html lang="en">
@@ -751,7 +758,6 @@ func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPos
 		</head>
 		<body onload="document.getElementById('payForm').submit()">
 			<div class="payment-card max-w-sm mx-auto bg-white rounded-3xl shadow-lg p-8 border border-gray-100 w-full">
-				<!-- Spinner Icon - Smaller -->
 				<div class="flex justify-center mb-6">
 					<div class="relative w-16 h-16 bg-gradient-to-br from-blue-50 to-blue-100 rounded-full flex items-center justify-center">
 						<svg class="spinner w-8 h-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -761,7 +767,6 @@ func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPos
 					</div>
 				</div>
 
-				<!-- Main Content -->
 				<div class="text-center mb-6">
 					<h1 class="text-2xl font-bold text-gray-900 mb-2">Redirecting to Payment</h1>
 					<p class="text-gray-600 text-sm leading-relaxed">
@@ -769,7 +774,6 @@ func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPos
 					</p>
 				</div>
 
-				<!-- Security Badge - Compact -->
 				<div class="flex items-center justify-center gap-2 mb-6 px-3 py-2 bg-green-50 rounded-lg border border-green-100">
 					<svg class="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
@@ -777,25 +781,10 @@ func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPos
 					<span class="text-xs font-semibold text-green-800">256-bit SSL Encrypted</span>
 				</div>
 
-				<!-- Hidden Form -->
 				<form id="payForm" method="POST" action="%s" style="display: none;">
-					<input type="hidden" name="pp_Amount" value="%s">
-					<input type="hidden" name="pp_BillReference" value="%s">
-					<input type="hidden" name="pp_Description" value="%s">
-					<input type="hidden" name="pp_Language" value="EN">
-					<input type="hidden" name="pp_TxnRefNo" value="%s">
-					<input type="hidden" name="pp_MerchantID" value="%s">
-					<input type="hidden" name="pp_Password" value="%s">
-					<input type="hidden" name="pp_ReturnURL" value="%s">
-					<input type="hidden" name="pp_TxnCurrency" value="PKR">
-					<input type="hidden" name="pp_TxnDateTime" value="%s">
-					<input type="hidden" name="pp_TxnExpiryDateTime" value="%s">
-					<input type="hidden" name="pp_TxnType" value="%s">
-					<input type="hidden" name="pp_Version" value="1.1">
-					<input type="hidden" name="pp_SecureHash" value="%s">
+%s
 				</form>
 
-				<!-- Fallback for JavaScript Disabled -->
 				<noscript>
 					<div class="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
 						<p class="text-yellow-900 font-semibold text-sm mb-3">JavaScript is disabled in your browser</p>
@@ -805,7 +794,6 @@ func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPos
 					</div>
 				</noscript>
 
-				<!-- Loading Text -->
 				<div class="mt-4 text-center">
 					<p class="text-xs text-gray-500 font-medium">Please wait...</p>
 					<p class="text-xs text-gray-400 mt-1">Do not close this window</p>
@@ -813,9 +801,7 @@ func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPos
 			</div>
 		</body>
 		</html>
-	`, jazzcashPostURL, fields[gateway.FieldAmount], fields[gateway.FieldBillReference], fields[gateway.FieldDescription],
-		fields[gateway.FieldTxnRefNo], fields[gateway.FieldMerchantID], fields[gateway.FieldPassword], fields[gateway.FieldReturnURL],
-		fields[gateway.FieldTxnDateTime], fields[gateway.FieldTxnExpiryDateTime], fields[gateway.FieldTxnType], fields[gateway.FieldSecureHash],
+	`, jazzcashPostURL, hiddenInputs.String(),
 	)
 
 	return html

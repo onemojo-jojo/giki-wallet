@@ -49,6 +49,7 @@ services:
     ports:
       - "127.0.0.1:${PORT:-8080}:8080"
     environment:
+      - TZ=Asia/Karachi
       - PORT=${PORT:-8080}
       - ENV=${ENV:-production}
       - DB_HOST=${DB_HOST}

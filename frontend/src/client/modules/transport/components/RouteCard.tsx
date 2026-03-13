@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Bus, Clock, MapPin, Users, Lock, ChevronDown } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatTime12, getCityName } from '../utils';
+import { formatTime12, formatDate, getCityName } from '../utils';
 import type { Trip } from '../validators';
 
 interface RouteCardProps {
@@ -188,7 +188,7 @@ export const RouteCard = ({
                     {/* Time Slots */}
                     <div className="space-y-2">
                         <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Select Time
+                            Select Trip
                         </label>
                         <div className="space-y-2">
                             {trips.length === 0 ? (
@@ -232,10 +232,15 @@ export const RouteCard = ({
                                                     disabled={isDisabled}
                                                     className="w-4 h-4 text-primary"
                                                 />
-                                                <div className="flex items-center gap-2">
-                                                    <Clock className="w-4 h-4 text-gray-400" />
-                                                    <span className="font-semibold text-sm">
-                                                        {formatTime12(trip.departure_time)}
+                                                <div className="flex flex-col">
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="w-4 h-4 text-gray-400" />
+                                                        <span className="font-semibold text-sm">
+                                                            {formatTime12(trip.departure_time)}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-400 font-medium ml-6">
+                                                        {formatDate(trip.departure_time)}
                                                     </span>
                                                 </div>
                                             </div>

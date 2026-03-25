@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-
 	"github.com/google/uuid"
 	"github.com/hash-walker/giki-wallet/internal/auth"
 	"github.com/hash-walker/giki-wallet/internal/common"
@@ -135,7 +134,8 @@ func (s *Service) InitiatePayment(ctx context.Context, payload TopUpRequest) (*T
 				return response, nil
 			}
 		}
-	} else if !errors.Is(err, pgx.ErrNoRows) {}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+	}
 
 	amountPaisa := common.AmountToLowestUnit(payload.Amount)
 
@@ -288,7 +288,6 @@ func (s *Service) CompleteCardPayment(ctx context.Context, tx pgx.Tx, rForm url.
 		GatewayMessage:    pgtype.Text{String: callback.Message, Valid: true},
 		GatewayStatusCode: pgtype.Text{String: callback.ResponseCode, Valid: true},
 	})
-
 
 	if err != nil {
 		return nil, commonerrors.Wrap(ErrTransactionUpdate, err)
@@ -516,12 +515,13 @@ func (s *Service) checkTransactionStatus(
 			}
 		}
 
-
-
 		return MapInquiryToTopUpResult(existing, *inquiryResult), nil
 
 	case PaymentStatusPending, PaymentStatusUnknown:
 		if time.Since(existing.CreatedAt) > 120*time.Second {
+			// Cosmetic only: tell the user it timed out.
+			// DB stays PENDING so the background reconciler can
+			// verify the real status with JazzCash via retries.
 			s.finalizeTransaction(ctx, existing.TxnRefNo, inquiryResult)
 			result := MapInquiryToTopUpResult(existing, *inquiryResult)
 			result.Status = PaymentStatusFailed
@@ -620,7 +620,6 @@ func (s *Service) pollTransactionOnce(ctx context.Context, txRefNo string) bool 
 	return done
 }
 
-
 func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inquiry *gateway.InquiryResponse) (bool, error) {
 	status := GatewayStatusToPaymentStatus(inquiry.Status)
 	isTerminal := status == PaymentStatusSuccess || status == PaymentStatusFailed
@@ -663,7 +662,7 @@ func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inqui
 	}
 
 	// 2. PHASE 2: Credit Wallet (ONLY IF Success & Terminal)
-	// This runs in a SEPARATE transaction. If this fails (e.g. unique constraint), 
+	// This runs in a SEPARATE transaction. If this fails (e.g. unique constraint),
 	// it won't roll back the Status Update from Phase 1.
 	if isTerminal && status == PaymentStatusSuccess {
 		creditErr := common.WithTransaction(ctx, s.dbPool, func(tx pgx.Tx) error {
@@ -684,7 +683,7 @@ func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inqui
 
 		if creditErr != nil {
 			middleware.LogAppError(fmt.Errorf("wallet credit failed for %s: %w", txRefNo, creditErr), "finalizer-phase2")
-			// We return true (it's terminal) but include the error 
+			// We return true (it's terminal) but include the error
 			// so the caller knows the credit failed.
 			return true, creditErr
 		}
@@ -692,9 +691,6 @@ func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inqui
 
 	return isTerminal, nil
 }
-
-
-
 
 // =============================================================================
 // HELPERS - Form Builder
@@ -868,8 +864,6 @@ func (s *Service) VerifyTransaction(ctx context.Context, txnRefNo string) (*Admi
 	}, nil
 }
 
-
-
 func (s *Service) GetLiabilityWalletBalance(ctx context.Context) (float64, error) {
 	return s.walletS.GetSystemWalletBalance(ctx, wallet.GikiWallet, wallet.SystemWalletLiability)
 }
@@ -981,11 +975,10 @@ func (s *Service) StalePendingRefNos(ctx context.Context) []string {
 	return refs
 }
 
-
 // ReconcileTransaction is called by the worker for each RECONCILE_PAYMENT job.
 // It performs the same status check as the admin "Verify" button.
-// If still PENDING, it re-enqueues with a 5-minute delay (up to 3 attempts).
-// On attempt 3, it leaves the transaction for manual admin review.
+// If still PENDING/UNKNOWN, it re-enqueues with exponential backoff (up to 3 attempts).
+// After max attempts, it marks the transaction as FAILED to prevent infinite sweep loops.
 func (s *Service) ReconcileTransaction(ctx context.Context, txnRefNo string, attempt int) error {
 	const maxAttempts = 3
 
@@ -994,49 +987,76 @@ func (s *Service) ReconcileTransaction(ctx context.Context, txnRefNo string, att
 		return fmt.Errorf("[reconciliation] GetTransactionByTxnRefNo failed for %s: %w", txnRefNo, err)
 	}
 
-	// Already resolved — nothing to do
 	if txn.Status == payment.CurrentStatusSUCCESS || txn.Status == payment.CurrentStatusFAILED {
 		log.Printf("[reconciliation] %s is already terminal (%s), skipping", txnRefNo, txn.Status)
 		return nil
 	}
 
-	// Query JazzCash and finalize (credits wallet if SUCCESS)
-	_, checkErr := s.checkTransactionStatus(ctx, txn)
-	if checkErr != nil {
-		// Gateway error — re-enqueue if retries remain
+	// Query JazzCash directly — do NOT use checkTransactionStatus which has
+	// a user-facing 120s timeout that would force-fail on the first attempt.
+	inquiryResult, inquiryErr := s.gatewayClient.Inquiry(ctx, gateway.InquiryRequest{TxnRefNo: txnRefNo})
+	if inquiryErr != nil {
 		if attempt < maxAttempts && s.workerS != nil {
-			log.Printf("[reconciliation] %s gateway error (attempt %d), will retry: %v", txnRefNo, attempt, checkErr)
+			delay := reconcileBackoff(attempt)
+			log.Printf("[reconciliation] %s gateway error (attempt %d/%d), retrying in %s: %v", txnRefNo, attempt, maxAttempts, delay, inquiryErr)
 			return s.workerS.EnqueueIn(ctx, "RECONCILE_PAYMENT", ReconcilePaymentRef{
 				TxnRefNo: txnRefNo,
 				Attempt:  attempt + 1,
-			}, 3*time.Minute)
+			}, delay)
 		}
-		log.Printf("[reconciliation] %s exhausted retries, leaving for admin", txnRefNo)
+		log.Printf("[reconciliation] %s gateway unreachable after %d attempts, marking FAILED", txnRefNo, maxAttempts)
+		s.forceFailTransaction(ctx, txnRefNo, fmt.Sprintf("Reconciliation failed: gateway unreachable after %d attempts", maxAttempts))
 		return nil
 	}
 
-	// Re-check DB status after the call
-	updated, err := s.q.GetTransactionByTxnRefNo(ctx, txnRefNo)
-	if err != nil {
-		return nil // best-effort
+	// Let finalizeTransaction handle SUCCESS/FAILED (credits wallet if needed)
+	isTerminal, finalizeErr := s.finalizeTransaction(ctx, txnRefNo, inquiryResult)
+	if finalizeErr != nil {
+		log.Printf("[reconciliation] %s finalize error: %v", txnRefNo, finalizeErr)
 	}
 
-	if updated.Status == payment.CurrentStatusSUCCESS || updated.Status == payment.CurrentStatusFAILED {
-		log.Printf("[reconciliation] %s resolved to %s ✓", txnRefNo, updated.Status)
+	if isTerminal {
+		log.Printf("[reconciliation] %s resolved to %s", txnRefNo, GatewayStatusToPaymentStatus(inquiryResult.Status))
 		return nil
 	}
 
-	// Still pending — retry or give up
+	// Still PENDING/UNKNOWN — retry with exponential backoff or give up
 	if attempt < maxAttempts && s.workerS != nil {
-		log.Printf("[reconciliation] %s still PENDING (attempt %d/%d), re-enqueueing in 3m", txnRefNo, attempt, maxAttempts)
+		delay := reconcileBackoff(attempt)
+		log.Printf("[reconciliation] %s still %s (attempt %d/%d), retrying in %s", txnRefNo, GatewayStatusToPaymentStatus(inquiryResult.Status), attempt, maxAttempts, delay)
 		return s.workerS.EnqueueIn(ctx, "RECONCILE_PAYMENT", ReconcilePaymentRef{
 			TxnRefNo: txnRefNo,
 			Attempt:  attempt + 1,
-		}, 3*time.Minute)
+		}, delay)
 	}
 
-	log.Printf("[reconciliation] %s still PENDING after %d attempts — leaving for admin", txnRefNo, maxAttempts)
+	gwStatus := GatewayStatusToPaymentStatus(inquiryResult.Status)
+	log.Printf("[reconciliation] %s still %s after %d attempts, marking FAILED", txnRefNo, gwStatus, maxAttempts)
+	s.forceFailTransaction(ctx, txnRefNo, fmt.Sprintf("Reconciliation exhausted: gateway returned %s after %d attempts", gwStatus, maxAttempts))
 	return nil
+}
+
+// reconcileBackoff returns exponential delay: attempt 1→3m, 2→6m, 3→12m.
+func reconcileBackoff(attempt int) time.Duration {
+	base := 3 * time.Minute
+	for i := 1; i < attempt; i++ {
+		base *= 2
+	}
+	return base
+}
+
+// forceFailTransaction marks a non-terminal transaction as FAILED so the
+// reconciliation sweep does not re-enqueue it indefinitely.
+func (s *Service) forceFailTransaction(ctx context.Context, txnRefNo string, reason string) {
+	err := s.q.UpdateGatewayTransactionStatus(ctx, payment.UpdateGatewayTransactionStatusParams{
+		Status:            payment.CurrentStatus(PaymentStatusFailed),
+		TxnRefNo:          txnRefNo,
+		GatewayMessage:    pgtype.Text{String: reason, Valid: true},
+		GatewayStatusCode: pgtype.Text{String: "RECONCILIATION_EXHAUSTED", Valid: true},
+	})
+	if err != nil {
+		middleware.LogAppError(fmt.Errorf("[reconciliation] failed to force-fail %s: %w", txnRefNo, err), "reconciliation-force-fail")
+	}
 }
 
 // ReconcilePaymentRef is the minimal payload for re-enqueuing a reconciliation job.

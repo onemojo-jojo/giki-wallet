@@ -17,8 +17,8 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteAllTokensForUser(ctx context.Context, userID uuid.UUID) error
 	DeleteUser(ctx context.Context, id uuid.UUID) error
-	GetUserAuthByEmail(ctx context.Context, email string) (GetUserAuthByEmailRow, error)
-	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error)
+	GetUserAuthByEmail(ctx context.Context, email string) (GikiWalletUser, error)
+	GetUserAuthByID(ctx context.Context, id uuid.UUID) (GikiWalletUser, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error)
 	GetUserByRegOrEmail(ctx context.Context, arg GetUserByRegOrEmailParams) (GetUserByRegOrEmailRow, error)

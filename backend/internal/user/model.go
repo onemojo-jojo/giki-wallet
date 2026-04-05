@@ -18,6 +18,7 @@ type RegisterRequest struct {
 	EmployeeID  string `json:"employee_id,omitempty"` // For employees
 	Password    string `json:"password"`
 	PhoneNumber string `json:"phone_number"`
+	Gender      string `json:"gender,omitempty"`
 }
 
 type User struct {
@@ -105,6 +106,7 @@ type AdminUser struct {
 	IsActive    bool      `json:"is_active"`
 	IsVerified  bool      `json:"is_verified"`
 	UserType    string    `json:"user_type"`
+	Gender      string    `json:"gender"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -118,6 +120,7 @@ func mapDBAdminUserToAdminUser(u userdb.ListUsersRow) AdminUser {
 		IsActive:    u.IsActive,
 		IsVerified:  u.IsVerified,
 		UserType:    u.UserType,
+		Gender:      common.TextToString(u.Gender),
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,
 	}
@@ -132,6 +135,7 @@ func mapDBUpdateUserStatusToAdminUser(u userdb.UpdateUserStatusRow) AdminUser {
 		IsActive:    u.IsActive,
 		IsVerified:  u.IsVerified,
 		UserType:    u.UserType,
+		Gender:      common.TextToString(u.Gender),
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,
 	}
@@ -153,6 +157,7 @@ func mapDBUserRowToAdminUser(row userdb.GikiWalletUser) AdminUser {
 		IsActive:    row.IsActive,
 		IsVerified:  row.IsVerified,
 		UserType:    row.UserType,
+		Gender:      common.TextToString(row.Gender),
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}
@@ -167,6 +172,7 @@ func mapUpdateUserDetailsRowToAdminUser(row userdb.UpdateUserDetailsRow) AdminUs
 		IsActive:    row.IsActive,
 		IsVerified:  row.IsVerified,
 		UserType:    row.UserType,
+		Gender:      common.TextToString(row.Gender),
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}
@@ -181,6 +187,7 @@ func mapGetUserByIDRowToAdminUser(row userdb.GetUserByIDRow) AdminUser {
 		IsActive:    row.IsActive,
 		IsVerified:  row.IsVerified,
 		UserType:    row.UserType,
+		Gender:      common.TextToString(row.Gender),
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}

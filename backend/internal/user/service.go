@@ -83,6 +83,7 @@ func (s *Service) CreateUser(ctx context.Context, req RegisterRequest) (*User, e
 			PasswordHash: passwordHash,
 			IsActive:     isActive,
 			IsVerified:   false,
+			Gender:       common.StringToText(req.Gender),
 		})
 
 		if userCreateErr != nil {
@@ -446,6 +447,7 @@ func (s *Service) UpdateUser(ctx context.Context, userID uuid.UUID, req Register
 		Name:        req.Name,
 		Email:       req.Email,
 		PhoneNumber: req.PhoneNumber,
+		Gender:      req.Gender,
 		ID:          userID,
 	})
 	if err != nil {
@@ -489,6 +491,7 @@ func (s *Service) AdminCreateUser(ctx context.Context, req RegisterRequest) (*Us
 			IsActive:     isActive,
 			IsVerified:   isVerified,
 			UserType:     strings.ToUpper(req.UserType),
+			Gender:       common.StringToText(req.Gender),
 		})
 		if userCreateErr != nil {
 			return userCreateErr

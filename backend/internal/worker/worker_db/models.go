@@ -345,6 +345,7 @@ type GikiWalletUser struct {
 	UserType     string      `json:"user_type"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
+	Gender       pgtype.Text `json:"gender"`
 }
 
 type GikiWalletWallet struct {

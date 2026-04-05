@@ -1280,9 +1280,9 @@ SELECT COUNT(*) FROM (
                 JOIN giki_transport.trip tr ON t.trip_id = tr.id
        WHERE t.user_id = $1
          AND t.status = 'CONFIRMED'
-         AND tr.departure_time >= date_trunc('week', $3::timestamptz)
-         AND tr.departure_time <  date_trunc('week', $3::timestamptz) + INTERVAL '7 days'
-         AND tr.direction = $2
+         AND tr.departure_time >= date_trunc('week', $2::timestamptz)
+         AND tr.departure_time <  date_trunc('week', $2::timestamptz) + INTERVAL '7 days'
+         AND tr.direction = $3
 
        UNION ALL
 
@@ -1291,22 +1291,22 @@ SELECT COUNT(*) FROM (
        FROM giki_transport.trip_holds h
                 JOIN giki_transport.trip tr ON h.trip_id = tr.id
        WHERE h.user_id = $1
-         AND tr.direction = $2
+         AND tr.direction = $3
          AND h.expires_at > NOW()
-         AND tr.departure_time >= date_trunc('week', $3::timestamptz)
-         AND tr.departure_time <  date_trunc('week', $3::timestamptz) + INTERVAL '7 days'
+         AND tr.departure_time >= date_trunc('week', $2::timestamptz)
+         AND tr.departure_time <  date_trunc('week', $2::timestamptz) + INTERVAL '7 days'
 ) as total_count
 `
 
 type GetWeeklyTicketCountByDirectionParams struct {
 	UserID        uuid.UUID `json:"user_id"`
-	Direction     string    `json:"direction"`
 	ReferenceTime time.Time `json:"reference_time"`
+	Direction     string    `json:"direction"`
 }
 
 // Counts CONFIRMED tickets + ACTIVE HOLDS for the same calendar week (Mon-Sun) as the given reference time, for a specific direction.
 func (q *Queries) GetWeeklyTicketCountByDirection(ctx context.Context, arg GetWeeklyTicketCountByDirectionParams) (int64, error) {
-	row := q.db.QueryRow(ctx, getWeeklyTicketCountByDirection, arg.UserID, arg.Direction, arg.ReferenceTime)
+	row := q.db.QueryRow(ctx, getWeeklyTicketCountByDirection, arg.UserID, arg.ReferenceTime, arg.Direction)
 	var count int64
 	err := row.Scan(&count)
 	return count, err

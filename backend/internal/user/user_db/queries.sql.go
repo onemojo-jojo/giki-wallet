@@ -78,21 +78,22 @@ func (q *Queries) CreateStudent(ctx context.Context, arg CreateStudentParams) (G
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO giki_wallet.users(name, email, phone_number, auth_provider, password_hash, password_algo, is_active, is_verified, user_type)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, created_at, updated_at
+INSERT INTO giki_wallet.users(name, email, phone_number, auth_provider, password_hash, password_algo, is_active, is_verified, user_type, gender)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, gender, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Name         string `json:"name"`
-	Email        string `json:"email"`
-	PhoneNumber  string `json:"phone_number"`
-	AuthProvider string `json:"auth_provider"`
-	PasswordHash string `json:"password_hash"`
-	PasswordAlgo string `json:"password_algo"`
-	IsActive     bool   `json:"is_active"`
-	IsVerified   bool   `json:"is_verified"`
-	UserType     string `json:"user_type"`
+	Name         string      `json:"name"`
+	Email        string      `json:"email"`
+	PhoneNumber  string      `json:"phone_number"`
+	AuthProvider string      `json:"auth_provider"`
+	PasswordHash string      `json:"password_hash"`
+	PasswordAlgo string      `json:"password_algo"`
+	IsActive     bool        `json:"is_active"`
+	IsVerified   bool        `json:"is_verified"`
+	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
 }
 
 type CreateUserRow struct {
@@ -105,6 +106,7 @@ type CreateUserRow struct {
 	IsActive     bool        `json:"is_active"`
 	IsVerified   bool        `json:"is_verified"`
 	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
@@ -120,6 +122,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		arg.IsActive,
 		arg.IsVerified,
 		arg.UserType,
+		arg.Gender,
 	)
 	var i CreateUserRow
 	err := row.Scan(
@@ -132,6 +135,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -159,14 +163,31 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserAuthByEmail = `-- name: GetUserAuthByEmail :one
-SELECT id, name, email, phone_number, auth_provider, external_id, password_hash, password_algo, is_active, is_verified, user_type, created_at, updated_at
+SELECT id, name, email, phone_number, auth_provider, external_id, password_hash, password_algo, is_active, is_verified, user_type, gender, created_at, updated_at
 FROM giki_wallet.users
 WHERE giki_wallet.users.email = $1
 `
 
-func (q *Queries) GetUserAuthByEmail(ctx context.Context, email string) (GikiWalletUser, error) {
+type GetUserAuthByEmailRow struct {
+	ID           uuid.UUID   `json:"id"`
+	Name         string      `json:"name"`
+	Email        string      `json:"email"`
+	PhoneNumber  string      `json:"phone_number"`
+	AuthProvider string      `json:"auth_provider"`
+	ExternalID   pgtype.Text `json:"external_id"`
+	PasswordHash string      `json:"password_hash"`
+	PasswordAlgo string      `json:"password_algo"`
+	IsActive     bool        `json:"is_active"`
+	IsVerified   bool        `json:"is_verified"`
+	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
+func (q *Queries) GetUserAuthByEmail(ctx context.Context, email string) (GetUserAuthByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getUserAuthByEmail, email)
-	var i GikiWalletUser
+	var i GetUserAuthByEmailRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -179,6 +200,7 @@ func (q *Queries) GetUserAuthByEmail(ctx context.Context, email string) (GikiWal
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -186,14 +208,31 @@ func (q *Queries) GetUserAuthByEmail(ctx context.Context, email string) (GikiWal
 }
 
 const getUserAuthByID = `-- name: GetUserAuthByID :one
-SELECT id, name, email, phone_number, auth_provider, external_id, password_hash, password_algo, is_active, is_verified, user_type, created_at, updated_at
+SELECT id, name, email, phone_number, auth_provider, external_id, password_hash, password_algo, is_active, is_verified, user_type, gender, created_at, updated_at
 FROM giki_wallet.users
 WHERE id = $1
 `
 
-func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GikiWalletUser, error) {
+type GetUserAuthByIDRow struct {
+	ID           uuid.UUID   `json:"id"`
+	Name         string      `json:"name"`
+	Email        string      `json:"email"`
+	PhoneNumber  string      `json:"phone_number"`
+	AuthProvider string      `json:"auth_provider"`
+	ExternalID   pgtype.Text `json:"external_id"`
+	PasswordHash string      `json:"password_hash"`
+	PasswordAlgo string      `json:"password_algo"`
+	IsActive     bool        `json:"is_active"`
+	IsVerified   bool        `json:"is_verified"`
+	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
+func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GetUserAuthByIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserAuthByID, id)
-	var i GikiWalletUser
+	var i GetUserAuthByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -206,6 +245,7 @@ func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GikiWallet
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -213,7 +253,7 @@ func (q *Queries) GetUserAuthByID(ctx context.Context, id uuid.UUID) (GikiWallet
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, created_at, updated_at
+SELECT id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, gender, created_at, updated_at
 FROM giki_wallet.users
 WHERE giki_wallet.users.email = $1
 `
@@ -228,6 +268,7 @@ type GetUserByEmailRow struct {
 	IsActive     bool        `json:"is_active"`
 	IsVerified   bool        `json:"is_verified"`
 	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
@@ -245,6 +286,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -252,7 +294,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, created_at, updated_at
+SELECT id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, gender, created_at, updated_at
 FROM giki_wallet.users
 WHERE id = $1
 `
@@ -267,6 +309,7 @@ type GetUserByIDRow struct {
 	IsActive     bool        `json:"is_active"`
 	IsVerified   bool        `json:"is_verified"`
 	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
@@ -284,6 +327,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -291,7 +335,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 }
 
 const getUserByRegOrEmail = `-- name: GetUserByRegOrEmail :one
-SELECT u.id, u.name, u.email, u.phone_number, u.auth_provider, u.external_id, u.is_active, u.is_verified, u.user_type, u.created_at, u.updated_at
+SELECT u.id, u.name, u.email, u.phone_number, u.auth_provider, u.external_id, u.is_active, u.is_verified, u.user_type, u.gender, u.created_at, u.updated_at
 FROM giki_wallet.users as u
 JOIN giki_wallet.student_profiles as s ON u.id = s.user_id
 WHERE u.email = $1 or s.reg_id = $2
@@ -312,6 +356,7 @@ type GetUserByRegOrEmailRow struct {
 	IsActive     bool        `json:"is_active"`
 	IsVerified   bool        `json:"is_verified"`
 	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
@@ -329,6 +374,7 @@ func (q *Queries) GetUserByRegOrEmail(ctx context.Context, arg GetUserByRegOrEma
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -336,7 +382,7 @@ func (q *Queries) GetUserByRegOrEmail(ctx context.Context, arg GetUserByRegOrEma
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, name, email, phone_number, is_active, is_verified, user_type, created_at, updated_at, COUNT(*) OVER() as total_count
+SELECT id, name, email, phone_number, is_active, is_verified, user_type, gender, created_at, updated_at, COUNT(*) OVER() as total_count
 FROM giki_wallet.users
 WHERE 
     ($1::text = '' OR 
@@ -362,16 +408,17 @@ type ListUsersParams struct {
 }
 
 type ListUsersRow struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Email       string    `json:"email"`
-	PhoneNumber string    `json:"phone_number"`
-	IsActive    bool      `json:"is_active"`
-	IsVerified  bool      `json:"is_verified"`
-	UserType    string    `json:"user_type"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	TotalCount  int64     `json:"total_count"`
+	ID          uuid.UUID   `json:"id"`
+	Name        string      `json:"name"`
+	Email       string      `json:"email"`
+	PhoneNumber string      `json:"phone_number"`
+	IsActive    bool        `json:"is_active"`
+	IsVerified  bool        `json:"is_verified"`
+	UserType    string      `json:"user_type"`
+	Gender      pgtype.Text `json:"gender"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+	TotalCount  int64       `json:"total_count"`
 }
 
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
@@ -397,6 +444,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUse
 			&i.IsActive,
 			&i.IsVerified,
 			&i.UserType,
+			&i.Gender,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.TotalCount,
@@ -417,9 +465,10 @@ SET
     name = COALESCE(NULLIF($2::text, ''), name),
     email = COALESCE(NULLIF($3::text, ''), email),
     phone_number = COALESCE(NULLIF($4::text, ''), phone_number),
+    gender = COALESCE(NULLIF($5::text, ''), gender),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, created_at, updated_at
+RETURNING id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, gender, created_at, updated_at
 `
 
 type UpdateUserDetailsParams struct {
@@ -427,6 +476,7 @@ type UpdateUserDetailsParams struct {
 	Name        string    `json:"name"`
 	Email       string    `json:"email"`
 	PhoneNumber string    `json:"phone_number"`
+	Gender      string    `json:"gender"`
 }
 
 type UpdateUserDetailsRow struct {
@@ -439,6 +489,7 @@ type UpdateUserDetailsRow struct {
 	IsActive     bool        `json:"is_active"`
 	IsVerified   bool        `json:"is_verified"`
 	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
@@ -449,6 +500,7 @@ func (q *Queries) UpdateUserDetails(ctx context.Context, arg UpdateUserDetailsPa
 		arg.Name,
 		arg.Email,
 		arg.PhoneNumber,
+		arg.Gender,
 	)
 	var i UpdateUserDetailsRow
 	err := row.Scan(
@@ -461,6 +513,7 @@ func (q *Queries) UpdateUserDetails(ctx context.Context, arg UpdateUserDetailsPa
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -471,7 +524,7 @@ const updateUserPasswordWithAlgo = `-- name: UpdateUserPasswordWithAlgo :one
 UPDATE giki_wallet.users
 SET password_hash = $2, password_algo = $3, updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, email, phone_number, is_active, is_verified, user_type, created_at, updated_at
+RETURNING id, name, email, phone_number, is_active, is_verified, user_type, gender, created_at, updated_at
 `
 
 type UpdateUserPasswordWithAlgoParams struct {
@@ -481,15 +534,16 @@ type UpdateUserPasswordWithAlgoParams struct {
 }
 
 type UpdateUserPasswordWithAlgoRow struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Email       string    `json:"email"`
-	PhoneNumber string    `json:"phone_number"`
-	IsActive    bool      `json:"is_active"`
-	IsVerified  bool      `json:"is_verified"`
-	UserType    string    `json:"user_type"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uuid.UUID   `json:"id"`
+	Name        string      `json:"name"`
+	Email       string      `json:"email"`
+	PhoneNumber string      `json:"phone_number"`
+	IsActive    bool        `json:"is_active"`
+	IsVerified  bool        `json:"is_verified"`
+	UserType    string      `json:"user_type"`
+	Gender      pgtype.Text `json:"gender"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 func (q *Queries) UpdateUserPasswordWithAlgo(ctx context.Context, arg UpdateUserPasswordWithAlgoParams) (UpdateUserPasswordWithAlgoRow, error) {
@@ -503,6 +557,7 @@ func (q *Queries) UpdateUserPasswordWithAlgo(ctx context.Context, arg UpdateUser
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -513,7 +568,7 @@ const updateUserStatus = `-- name: UpdateUserStatus :one
 UPDATE giki_wallet.users
 SET is_active = $2, updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, email, phone_number, is_active, is_verified, user_type, created_at, updated_at
+RETURNING id, name, email, phone_number, is_active, is_verified, user_type, gender, created_at, updated_at
 `
 
 type UpdateUserStatusParams struct {
@@ -522,15 +577,16 @@ type UpdateUserStatusParams struct {
 }
 
 type UpdateUserStatusRow struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Email       string    `json:"email"`
-	PhoneNumber string    `json:"phone_number"`
-	IsActive    bool      `json:"is_active"`
-	IsVerified  bool      `json:"is_verified"`
-	UserType    string    `json:"user_type"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uuid.UUID   `json:"id"`
+	Name        string      `json:"name"`
+	Email       string      `json:"email"`
+	PhoneNumber string      `json:"phone_number"`
+	IsActive    bool        `json:"is_active"`
+	IsVerified  bool        `json:"is_verified"`
+	UserType    string      `json:"user_type"`
+	Gender      pgtype.Text `json:"gender"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (UpdateUserStatusRow, error) {
@@ -544,6 +600,7 @@ func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusPara
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -554,7 +611,7 @@ const updateUserVerification = `-- name: UpdateUserVerification :one
 UPDATE giki_wallet.users
 SET is_verified = TRUE, is_active = TRUE, updated_at = NOW()
 WHERE id = $1
-RETURNING id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, created_at, updated_at
+RETURNING id, name, email, phone_number, auth_provider, external_id, is_active, is_verified, user_type, gender, created_at, updated_at
 `
 
 type UpdateUserVerificationRow struct {
@@ -567,6 +624,7 @@ type UpdateUserVerificationRow struct {
 	IsActive     bool        `json:"is_active"`
 	IsVerified   bool        `json:"is_verified"`
 	UserType     string      `json:"user_type"`
+	Gender       pgtype.Text `json:"gender"`
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
@@ -584,6 +642,7 @@ func (q *Queries) UpdateUserVerification(ctx context.Context, id uuid.UUID) (Upd
 		&i.IsActive,
 		&i.IsVerified,
 		&i.UserType,
+		&i.Gender,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -30,15 +30,10 @@ func (h *Handler) TopUp(w http.ResponseWriter, r *http.Request) {
 	requestID := middleware.GetRequestID(r.Context())
 	var params TopUpRequest
 
-	userRole, ok := auth.GetUserRoleFromContext(r.Context())
+	_, ok := auth.GetUserRoleFromContext(r.Context())
 
 	if !ok {
 		middleware.HandleError(w, commonerrors.ErrUnauthorized, requestID)
-		return
-	}
-
-	if userRole == auth.RoleEmployee {
-		middleware.HandleError(w, commonerrors.ErrForbidden, requestID)
 		return
 	}
 

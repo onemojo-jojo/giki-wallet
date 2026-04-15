@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { ArrowRightLeft, ArrowUpCircle, Bus, Ticket, User, ChevronRight } from 'lucide-react';
 import { useWallet } from '@/context/WalletContext';
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/shared/stores/authStore';
 
 type Tile = {
     key: string;
@@ -15,7 +14,6 @@ type Tile = {
 
 export const ServiceTiles = ({ onTransportClick }: { onTransportClick?: () => void }) => {
     const { onTopUpClick, onMyTicketsClick, onMyAccountClick } = useWallet();
-    const { user } = useAuthStore();
 
     const tiles = useMemo<Tile[]>(
         () => {
@@ -53,12 +51,9 @@ export const ServiceTiles = ({ onTransportClick }: { onTransportClick?: () => vo
                 },
             ];
 
-            if (user?.user_type === 'EMPLOYEE') {
-                return allTiles.filter(t => t.key !== 'topup');
-            }
             return allTiles;
         },
-        [onMyAccountClick, onMyTicketsClick, onTopUpClick, onTransportClick, user?.user_type]
+        [onMyAccountClick, onMyTicketsClick, onTopUpClick, onTransportClick]
     );
 
     return (

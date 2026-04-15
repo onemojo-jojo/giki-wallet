@@ -15,7 +15,7 @@ export const HomePage = () => {
 
     return (
         <div className="space-y-6">
-            {user && user.user_type !== 'EMPLOYEE' && (
+            {user && (
                 <div className="mt-6">
                     <WalletPage />
                 </div>

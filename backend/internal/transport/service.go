@@ -359,7 +359,7 @@ func (s *Service) ConfirmBatch(ctx context.Context, userID uuid.UUID, userRole s
 	tripCache := make(map[uuid.UUID]transport_db.GetTripRow)
 	routeCache := make(map[uuid.UUID]transport_db.GetRouteDetailsForTripRow)
 
-	isStudent := strings.ToUpper(userRole) == "STUDENT"
+	shouldChargeWallet := strings.ToUpper(userRole) == "STUDENT" || strings.ToUpper(userRole) == "EMPLOYEE"
 
 	var emailDetails []worker.TicketDetail
 	var totalPrice int
@@ -374,7 +374,7 @@ func (s *Service) ConfirmBatch(ctx context.Context, userID uuid.UUID, userRole s
 		var err error
 
 		var userWalletID, revenueWalletID uuid.UUID
-		if isStudent {
+		if shouldChargeWallet {
 			userWallet, err := s.wallet.GetOrCreateWallet(ctx, tx, userID)
 			if err != nil {
 				return err
@@ -491,7 +491,7 @@ func (s *Service) ConfirmBatch(ctx context.Context, userID uuid.UUID, userRole s
 				return commonerrors.Wrap(commonerrors.ErrDatabase, err)
 			}
 
-			if isStudent && price > 0 {
+			if shouldChargeWallet && price > 0 {
 				err := s.wallet.ExecuteTransaction(
 					ctx,
 					tx,

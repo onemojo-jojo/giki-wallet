@@ -517,6 +517,25 @@ func (h *Handler) CancelTrip(w http.ResponseWriter, r *http.Request) {
 	common.ResponseWithJSON(w, http.StatusOK, map[string]string{"message": "Trip cancelled and refunds processed"}, requestID)
 }
 
+func (h *Handler) ReconcileEmployeeCancelRefunds(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetRequestID(r.Context())
+
+	result, err := h.service.ReconcileEmployeeCancelRefunds(r.Context())
+	if err != nil {
+		middleware.HandleError(w, err, requestID)
+		return
+	}
+
+	h.logAdminAction(r.Context(), r, audit.ActionAdminCancelTrip, nil, map[string]interface{}{
+		"action":    "reconcile_employee_cancel_refunds",
+		"refunded":  result.Refunded,
+		"processed": result.Processed,
+		"skipped":   result.Skipped,
+	})
+
+	common.ResponseWithJSON(w, http.StatusOK, result, requestID)
+}
+
 // logAdminAction is a helper to centralize audit logging
 func (h *Handler) logAdminAction(ctx context.Context, r *http.Request, action string, targetID *uuid.UUID, details map[string]interface{}) {
 	ip := common.GetClientIP(r)

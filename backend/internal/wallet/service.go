@@ -204,6 +204,22 @@ func (s *Service) VerifyBookingDebitExists(ctx context.Context, ticketID string)
 	}
 	return true, nil
 }
+// VerifyRefundExists checks that a REFUND transaction already exists for the given ticket ID.
+// Used during reconciliation to prevent issuing duplicate refunds.
+func (s *Service) VerifyRefundExists(ctx context.Context, ticketID string) (bool, error) {
+	_, err := s.q.GetTransactionHeaderByTypeAndRef(ctx, wallet.GetTransactionHeaderByTypeAndRefParams{
+		Type:        "REFUND",
+		ReferenceID: ticketID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, commonerrors.Wrap(ErrDatabase, err)
+	}
+	return true, nil
+}
+
 func (s *Service) GetOrCreateWallet(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (wallet.GikiWalletWallet, error) {
 	walletQ := s.q
 	if tx != nil {

@@ -152,6 +152,7 @@ func (s *Server) MountRoutes() {
 		// Transport Revenue
 		r.Get("/transport/transactions", s.Transport.AdminGetRevenueTransactions)
 		r.Get("/transport/trips/export", s.Transport.HandleExportTrips)
+		r.Post("/transport/reconcile-employee-refunds", s.Transport.ReconcileEmployeeCancelRefunds)
 
 		// Tickets Management
 		r.Get("/tickets", s.Transport.HandleAdminTickets)

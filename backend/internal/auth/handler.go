@@ -15,15 +15,43 @@ import (
 )
 
 type Handler struct {
-	service *Service
-	audit   *audit.Service
+	service                *Service
+	audit                  *audit.Service
+	refreshTokenCookiePath string
 }
 
-func NewHandler(service *Service, audit *audit.Service) *Handler {
+const (
+	refreshTokenCookieName = "refresh_token"
+	refreshTokenMaxAge     = 60 * 24 * 60 * 60
+)
+
+func NewHandler(service *Service, audit *audit.Service, refreshTokenCookiePath string) *Handler {
 	return &Handler{
-		service: service,
-		audit:   audit,
+		service:                service,
+		audit:                  audit,
+		refreshTokenCookiePath: refreshTokenCookiePath,
 	}
+}
+
+func (h *Handler) setRefreshTokenCookie(w http.ResponseWriter, token string, maxAge int) {
+	path := h.refreshTokenCookiePath
+	if path == "" {
+		path = "/auth/refresh"
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshTokenCookieName,
+		Value:    token,
+		Path:     path,
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func (h *Handler) clearRefreshTokenCookie(w http.ResponseWriter) {
+	h.setRefreshTokenCookie(w, "", -1)
 }
 
 // Authenticate is a middleware that validates the JWT token
@@ -137,8 +165,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Status:    audit.StatusSuccess,
 	})
 
-	// Set refresh token as HttpOnly cookie (immune to XSS)
-	setRefreshTokenCookie(w, res.Tokens.RefreshToken, 60*24*60*60) // 60 days
+	h.setRefreshTokenCookie(w, res.Tokens.RefreshToken, refreshTokenMaxAge)
 
 	response := ToLoginResponse(*res)
 	common.ResponseWithJSON(w, http.StatusOK, response, requestID)
@@ -159,7 +186,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	clearRefreshTokenCookie(w)
+	h.clearRefreshTokenCookie(w)
 	w.WriteHeader(http.StatusNoContent)
 	_ = requestID
 }
@@ -200,16 +227,15 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set refresh token as HttpOnly cookie (immune to XSS)
-	setRefreshTokenCookie(w, res.Tokens.RefreshToken, 60*24*60*60) // 60 days
+	h.setRefreshTokenCookie(w, res.Tokens.RefreshToken, refreshTokenMaxAge)
 
 	common.ResponseWithJSON(w, http.StatusOK, ToLoginResponse(*res), requestID)
 }
+
 func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	requestID := middleware.GetRequestID(r.Context())
 
-	// Read refresh token from HttpOnly cookie (not JSON body)
-	cookie, err := r.Cookie("refresh_token")
+	cookie, err := r.Cookie(refreshTokenCookieName)
 	if err != nil || cookie.Value == "" {
 		middleware.HandleError(w, ErrInvalidRefreshToken, requestID)
 		return
@@ -217,14 +243,12 @@ func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	tokenPair, err := h.service.RefreshToken(r.Context(), cookie.Value)
 	if err != nil {
-		// If refresh fails, clear the invalid cookie
-		clearRefreshTokenCookie(w)
+		h.clearRefreshTokenCookie(w)
 		middleware.HandleError(w, err, requestID)
 		return
 	}
 
-	// Set the new refresh token cookie (rotation)
-	setRefreshTokenCookie(w, tokenPair.RefreshToken, 60*24*60*60) // 60 days
+	h.setRefreshTokenCookie(w, tokenPair.RefreshToken, refreshTokenMaxAge)
 
 	common.ResponseWithJSON(w, http.StatusOK, ToLoginResponse(LoginResult{
 		Tokens: *tokenPair,

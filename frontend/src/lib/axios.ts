@@ -12,7 +12,7 @@ export const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    withCredentials: true, // Send HttpOnly cookies (refresh_token) with requests
+    withCredentials: true,
 });
 
 // Request interceptor - Add auth token if available
@@ -77,7 +77,6 @@ apiClient.interceptors.response.use(
                         const { useAuthStore } = await import('@/shared/stores/authStore');
                         const store = useAuthStore.getState();
 
-                        // Attempt silent refresh — HttpOnly cookie is sent automatically
                         console.log('Session expired, attempting silent refresh...');
                         await store.refreshSession();
 
@@ -130,4 +129,3 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
-

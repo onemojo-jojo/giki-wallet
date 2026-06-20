@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hash-walker/giki-wallet/internal/api"
@@ -96,7 +97,7 @@ func main() {
 	userService := user.NewService(pool, newWorker)
 	userHandler := user.NewHandler(userService, auditService)
 	authService := auth.NewService(pool, cfg.Secrets.JWTSecret, newWorker)
-	authHandler := auth.NewHandler(authService, auditService)
+	authHandler := auth.NewHandler(authService, auditService, cfg.Server.RefreshTokenCookiePath)
 	auditHandler := audit.NewHandler(auditService)
 	walletService := wallet.NewService(pool, cfg.Secrets.LedgerSecret)
 	walletHandler := wallet.NewHandler(walletService)
@@ -109,14 +110,13 @@ func main() {
 	newWorker.SetReconciler(paymentService.ReconcileTransaction)
 	newWorker.SetStaleFetcher(paymentService.StalePendingRefNos)
 
-
 	feedbackService := feedback.NewService(pool)
 	feedbackHandler := feedback.NewHandler(feedbackService)
 
 	srv := api.NewServer(userHandler, authHandler, paymentHandler, transportHandler, walletHandler, newWorker, auditService, auditHandler, configHandler, feedbackHandler)
 	srv.MountRoutes()
 
-	allowedOrigins := []string{cfg.Server.AppURL}
+	allowedOrigins := []string{strings.TrimRight(cfg.Server.AppURL, "/")}
 	if os.Getenv("ENV") != "production" {
 		allowedOrigins = append(allowedOrigins, "http://localhost:3000", "http://localhost:5173")
 	}
@@ -126,7 +126,7 @@ func main() {
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
 		AllowCredentials: true,
-		Debug:            false, // Disable Debugging for production
+		Debug:            os.Getenv("ENV") != "production",
 	})
 
 	handler := c.Handler(srv.Router)

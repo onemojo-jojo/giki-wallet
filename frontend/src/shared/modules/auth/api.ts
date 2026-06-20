@@ -55,7 +55,6 @@ export async function signOut() {
 }
 
 export async function refreshToken() {
-    // No body needed — refresh token is sent automatically via HttpOnly cookie
     const res = await apiClient.post<AuthResponse>('/auth/refresh');
     return res.data;
 }

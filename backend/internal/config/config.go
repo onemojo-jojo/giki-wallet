@@ -82,8 +82,8 @@ func LoadConfig() *Config {
 			SenderEmail:  getRequiredEnv("MS_GRAPH_SENDER_EMAIL"),
 		},
 		Secrets: SecretsConfig{
-			JWTSecret:    getEnvWithDefault("TOKEN_SECRET", "super-secret-dev-token"),
-			LedgerSecret: getEnvWithDefault("LEDGER_HASH_SECRET", "super-secret-dev-ledger"),
+			JWTSecret:    getRequiredEnv("TOKEN_SECRET"),
+			LedgerSecret: getRequiredEnv("LEDGER_HASH_SECRET"),
 		},
 	}
 

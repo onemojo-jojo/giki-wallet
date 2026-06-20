@@ -30,9 +30,8 @@ type LoginResult struct {
 }
 
 type AuthTokens struct {
-	AccessToken  string        `json:"access_token"`
-	RefreshToken string        `json:"refresh_token"`
-	ExpiresAt    time.Duration `json:"expires_at"`
+	AccessToken string        `json:"access_token"`
+	ExpiresAt   time.Duration `json:"expires_at"`
 }
 
 type LoginResponse struct {
@@ -60,9 +59,8 @@ func ToLoginResponse(result LoginResult) LoginResponse {
 				return nil
 			}
 			return &AuthTokens{
-				AccessToken:  result.Tokens.AccessToken,
-				RefreshToken: result.Tokens.RefreshToken,
-				ExpiresAt:    result.Tokens.ExpiresAt,
+				AccessToken: result.Tokens.AccessToken,
+				ExpiresAt:   result.Tokens.ExpiresAt,
 			}
 		}(),
 	}

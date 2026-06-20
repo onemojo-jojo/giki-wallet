@@ -137,6 +137,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		Status:    audit.StatusSuccess,
 	})
 
+	// Set refresh token as HttpOnly cookie (immune to XSS)
+	setRefreshTokenCookie(w, res.Tokens.RefreshToken, 60*24*60*60) // 60 days
+
 	response := ToLoginResponse(*res)
 	common.ResponseWithJSON(w, http.StatusOK, response, requestID)
 }
@@ -156,6 +159,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	clearRefreshTokenCookie(w)
 	w.WriteHeader(http.StatusNoContent)
 	_ = requestID
 }
@@ -196,35 +200,31 @@ func (h *Handler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set refresh token as HttpOnly cookie (immune to XSS)
+	setRefreshTokenCookie(w, res.Tokens.RefreshToken, 60*24*60*60) // 60 days
+
 	common.ResponseWithJSON(w, http.StatusOK, ToLoginResponse(*res), requestID)
 }
 func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	requestID := middleware.GetRequestID(r.Context())
 
-	var params struct {
-		RefreshToken string `json:"refresh_token"`
-	}
-
-	if r.Body == nil {
-		middleware.HandleError(w, commonerrors.ErrMissingRequestBody, requestID)
+	// Read refresh token from HttpOnly cookie (not JSON body)
+	cookie, err := r.Cookie("refresh_token")
+	if err != nil || cookie.Value == "" {
+		middleware.HandleError(w, ErrInvalidRefreshToken, requestID)
 		return
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-		middleware.HandleError(w, commonerrors.Wrap(commonerrors.ErrInvalidJSON, err), requestID)
-		return
-	}
-
-	if params.RefreshToken == "" {
-		middleware.HandleError(w, commonerrors.ErrMissingField.WithDetails("fields", "refresh_token"), requestID)
-		return
-	}
-
-	tokenPair, err := h.service.RefreshToken(r.Context(), params.RefreshToken)
+	tokenPair, err := h.service.RefreshToken(r.Context(), cookie.Value)
 	if err != nil {
+		// If refresh fails, clear the invalid cookie
+		clearRefreshTokenCookie(w)
 		middleware.HandleError(w, err, requestID)
 		return
 	}
+
+	// Set the new refresh token cookie (rotation)
+	setRefreshTokenCookie(w, tokenPair.RefreshToken, 60*24*60*60) // 60 days
 
 	common.ResponseWithJSON(w, http.StatusOK, ToLoginResponse(LoginResult{
 		Tokens: *tokenPair,
@@ -269,4 +269,20 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	common.ResponseWithJSON(w, http.StatusOK, map[string]string{"message": "Password has been reset successfully."}, requestID)
+}
+
+func setRefreshTokenCookie(w http.ResponseWriter, token string, maxAge int) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    token,
+		Path:     "/auth/refresh",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func clearRefreshTokenCookie(w http.ResponseWriter) {
+	setRefreshTokenCookie(w, "", -1) // MaxAge -1 = delete
 }

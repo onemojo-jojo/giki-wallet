@@ -22,7 +22,6 @@ export type AuthResponse = {
     user_type: 'STUDENT' | 'EMPLOYEE' | 'SUPER_ADMIN' | 'TRANSPORT_ADMIN' | 'FINANCE_ADMIN';
     auth?: {
         access_token: string;
-        refresh_token: string;
         expires_at: number;
     };
 };
@@ -55,8 +54,9 @@ export async function signOut() {
     await apiClient.post('/auth/signout');
 }
 
-export async function refreshToken(token: string) {
-    const res = await apiClient.post<AuthResponse>('/auth/refresh', { refresh_token: token });
+export async function refreshToken() {
+    // No body needed — refresh token is sent automatically via HttpOnly cookie
+    const res = await apiClient.post<AuthResponse>('/auth/refresh');
     return res.data;
 }
 

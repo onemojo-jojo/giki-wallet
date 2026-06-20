@@ -25,7 +25,6 @@ export type AuthUser = {
 
 type AuthState = {
     token: string | null;
-    refreshToken: string | null;
     user: AuthUser | null;
     isLoading: boolean;
     initialized: boolean;
@@ -67,7 +66,6 @@ function mapAuthResponseToUser(data: AuthResponse): AuthUser {
 export const useAuthStore = create<AuthState>()(
     (set) => ({
         token: localStorage.getItem('auth_token'),
-        refreshToken: localStorage.getItem('refresh_token'),
         user: null,
         isLoading: false,
         initialized: false,
@@ -76,21 +74,20 @@ export const useAuthStore = create<AuthState>()(
         signOut: () => {
             void apiSignOut().catch(() => { });
             localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token');
-            set({ token: null, refreshToken: null, user: null, error: null, isLoading: false, initialized: true });
+            // Refresh token cookie is cleared by the backend on POST /auth/signout
+            set({ token: null, user: null, error: null, isLoading: false, initialized: true });
         },
 
         loadMe: async () => {
             try {
                 const token = localStorage.getItem('auth_token');
                 if (!token) {
-                    set({ token: null, refreshToken: null, user: null, initialized: true });
+                    set({ token: null, user: null, initialized: true });
                     return;
                 }
                 const data = await getMe();
                 set({
                     token,
-                    refreshToken: localStorage.getItem('refresh_token'),
                     user: mapAuthResponseToUser(data),
                     initialized: true
                 });
@@ -107,16 +104,14 @@ export const useAuthStore = create<AuthState>()(
             try {
                 const data = await verifyEmail(token);
                 const accessToken = data.auth?.access_token;
-                const refreshToken = data.auth?.refresh_token;
 
-                if (!accessToken || !refreshToken) throw new Error('Incomplete token pair received');
+                if (!accessToken) throw new Error('No access token received');
 
                 localStorage.setItem('auth_token', accessToken);
-                localStorage.setItem('refresh_token', refreshToken);
+                // Refresh token is set as HttpOnly cookie by the backend
 
                 set({
                     token: accessToken,
-                    refreshToken,
                     user: mapAuthResponseToUser(data),
                     isLoading: false,
                     error: null,
@@ -130,28 +125,20 @@ export const useAuthStore = create<AuthState>()(
         },
 
         refreshSession: async () => {
-            const currentRefreshToken = localStorage.getItem('refresh_token');
-            if (!currentRefreshToken) {
-                useAuthStore.getState().signOut();
-                return;
-            }
-
             try {
                 const { refreshToken: apiRefreshToken } = await import('@/shared/modules/auth/api');
-                const data = await apiRefreshToken(currentRefreshToken);
+                // No token arg needed — HttpOnly cookie is sent automatically by the browser
+                const data = await apiRefreshToken();
 
                 const accessToken = data.auth?.access_token;
-                const newRefreshToken = data.auth?.refresh_token;
 
-                if (!accessToken || !newRefreshToken) throw new Error('Failed to rotate tokens');
+                if (!accessToken) throw new Error('Failed to refresh session');
 
                 localStorage.setItem('auth_token', accessToken);
-                localStorage.setItem('refresh_token', newRefreshToken);
 
                 set({
                     token: accessToken,
-                    refreshToken: newRefreshToken,
-                    // If we don't have user object yet (silent refresh), map it if it exists in response
+                    // If we don't have user object yet (silent refresh), keep existing
                     user: data.id ? mapAuthResponseToUser(data) : useAuthStore.getState().user,
                     error: null,
                     initialized: true
@@ -183,16 +170,14 @@ export const useAuthStore = create<AuthState>()(
             try {
                 const data = await signIn(input);
                 const accessToken = data.auth?.access_token;
-                const refreshToken = data.auth?.refresh_token;
 
-                if (!accessToken || !refreshToken) throw new Error('Incomplete token pair received');
+                if (!accessToken) throw new Error('No access token received');
 
                 localStorage.setItem('auth_token', accessToken);
-                localStorage.setItem('refresh_token', refreshToken);
+                // Refresh token is set as HttpOnly cookie by the backend
 
                 set({
                     token: accessToken,
-                    refreshToken,
                     user: mapAuthResponseToUser(data),
                     isLoading: false,
                     error: null,

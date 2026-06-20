@@ -12,7 +12,7 @@ export const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    withCredentials: false,
+    withCredentials: true, // Send HttpOnly cookies (refresh_token) with requests
 });
 
 // Request interceptor - Add auth token if available
@@ -77,18 +77,17 @@ apiClient.interceptors.response.use(
                         const { useAuthStore } = await import('@/shared/stores/authStore');
                         const store = useAuthStore.getState();
 
-                        if (store.refreshToken) {
-                            console.log('Session expired, attempting silent refresh...');
-                            await store.refreshSession();
+                        // Attempt silent refresh — HttpOnly cookie is sent automatically
+                        console.log('Session expired, attempting silent refresh...');
+                        await store.refreshSession();
 
-                            const newToken = localStorage.getItem('auth_token');
-                            isRefreshing = false;
+                        const newToken = localStorage.getItem('auth_token');
+                        isRefreshing = false;
 
-                            if (newToken) {
-                                onRereshed(newToken);
-                                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-                                return apiClient(originalRequest);
-                            }
+                        if (newToken) {
+                            onRereshed(newToken);
+                            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                            return apiClient(originalRequest);
                         }
                     } catch (refreshError) {
                         isRefreshing = false;
@@ -107,7 +106,6 @@ apiClient.interceptors.response.use(
             }
 
             localStorage.removeItem('auth_token');
-            localStorage.removeItem('refresh_token');
 
             if (window.location.pathname !== '/login' && window.location.pathname !== '/admin/signin') {
                 console.warn('Session expired. Please log in again.');

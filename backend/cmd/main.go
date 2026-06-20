@@ -116,9 +116,13 @@ func main() {
 	srv := api.NewServer(userHandler, authHandler, paymentHandler, transportHandler, walletHandler, newWorker, auditService, auditHandler, configHandler, feedbackHandler)
 	srv.MountRoutes()
 
+	allowedOrigins := []string{cfg.Server.AppURL}
+	if os.Getenv("ENV") != "production" {
+		allowedOrigins = append(allowedOrigins, "http://localhost:3000", "http://localhost:5173")
+	}
+
 	c := cors.New(cors.Options{
-		// Allow any origin in development (for production, use AllowedOrigins with specific domains)
-		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", "X-Requested-With"},
 		AllowCredentials: true,

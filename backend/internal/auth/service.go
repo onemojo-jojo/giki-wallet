@@ -212,6 +212,8 @@ func (s *Service) issueTokenPair(ctx context.Context, tx pgx.Tx, user user_db.Gi
 	}
 
 	refreshToken, err := MakeRefreshToken()
+	refreshTokenHash := sha256Hex(refreshToken)
+
 	expirationAt := time.Now().Add(60 * 24 * time.Hour)
 
 	if err != nil {
@@ -221,7 +223,7 @@ func (s *Service) issueTokenPair(ctx context.Context, tx pgx.Tx, user user_db.Gi
 	authQ := s.authQ.WithTx(tx)
 
 	_, err = authQ.CreateRefreshToken(ctx, auth.CreateRefreshTokenParams{
-		TokenHash: refreshToken,
+		TokenHash: refreshTokenHash,
 		ExpiresAt: common.TimeToPgTime(expirationAt),
 		UserID:    user.ID,
 	})
@@ -311,12 +313,14 @@ func MakeRefreshToken() (string, error) {
 }
 
 func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*TokenPairs, error) {
+
+	incomingHash := sha256Hex(refreshToken)
 	var result *TokenPairs
 
 	err := common.WithTransaction(ctx, s.dbPool, func(tx pgx.Tx) error {
 		authQ := s.authQ.WithTx(tx)
 
-		rt, err := authQ.GetRefreshTokenByHash(ctx, refreshToken)
+		rt, err := authQ.GetRefreshTokenByHash(ctx, incomingHash)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return ErrInvalidRefreshToken
@@ -348,9 +352,9 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*Token
 		}
 
 		err = authQ.ReplaceRefreshToken(ctx, auth.ReplaceRefreshTokenParams{
-			TokenHash: refreshToken,
+			TokenHash: incomingHash,
 			ReplacedByToken: pgtype.Text{
-				String: tokenPair.RefreshToken,
+				String: sha256Hex(tokenPair.RefreshToken),
 				Valid:  true,
 			},
 		})

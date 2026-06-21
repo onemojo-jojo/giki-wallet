@@ -212,13 +212,12 @@ func (s *Service) issueTokenPair(ctx context.Context, tx pgx.Tx, user user_db.Gi
 	}
 
 	refreshToken, err := MakeRefreshToken()
-	refreshTokenHash := sha256Hex(refreshToken)
-
-	expirationAt := time.Now().Add(60 * 24 * time.Hour)
-
 	if err != nil {
 		return TokenPairs{}, commonerrors.Wrap(commonerrors.ErrInternal, err)
 	}
+
+	refreshTokenHash := sha256Hex(refreshToken)
+	expirationAt := time.Now().Add(60 * 24 * time.Hour)
 
 	authQ := s.authQ.WithTx(tx)
 
@@ -313,7 +312,6 @@ func MakeRefreshToken() (string, error) {
 }
 
 func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*TokenPairs, error) {
-
 	incomingHash := sha256Hex(refreshToken)
 	var result *TokenPairs
 

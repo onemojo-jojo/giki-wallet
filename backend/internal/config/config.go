@@ -24,9 +24,10 @@ type DatabaseConfig struct {
 }
 
 type ServerConfig struct {
-	Port        string
-	AppURL      string
-	AppTimezone string
+	Port                   string
+	AppURL                 string
+	AppTimezone            string
+	RefreshTokenCookiePath string
 }
 
 type JazzcashConfig struct {
@@ -59,9 +60,10 @@ func LoadConfig() *Config {
 			DbURL: getRequiredEnv("DB_URL"),
 		},
 		Server: ServerConfig{
-			Port:        getEnvWithDefault("PORT", "8080"),
-			AppURL:      getEnvWithDefault("APP_URL", "http://localhost:3000"),
-			AppTimezone: getEnvWithDefault("APP_TIMEZONE", "Asia/Karachi"),
+			Port:                   getEnvWithDefault("PORT", "8080"),
+			AppURL:                 getEnvWithDefault("APP_URL", "http://localhost:3000"),
+			AppTimezone:            getEnvWithDefault("APP_TIMEZONE", "Asia/Karachi"),
+			RefreshTokenCookiePath: getEnvWithDefault("REFRESH_TOKEN_COOKIE_PATH", "/auth/refresh"),
 		},
 		Jazzcash: JazzcashConfig{
 			MerchantID:       getRequiredEnv("JAZZCASH_MERCHANT_ID"),

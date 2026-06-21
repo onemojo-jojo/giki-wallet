@@ -66,9 +66,11 @@ services:
       - MS_GRAPH_SENDER_EMAIL=${MS_GRAPH_SENDER_EMAIL}
 
       - TOKEN_SECRET=${TOKEN_SECRET}
+      - LEDGER_HASH_SECRET=${LEDGER_HASH_SECRET}
 
       # Frontend App URL for payment redirects
       - APP_URL=${APP_URL:-https://giktransport.giki.edu.pk}
+      - REFRESH_TOKEN_COOKIE_PATH=${REFRESH_TOKEN_COOKIE_PATH:-/api/auth/refresh}
 
       # JazzCash Payment Gateway Configuration
       - JAZZCASH_MERCHANT_ID=${JAZZCASH_MERCHANT_ID}

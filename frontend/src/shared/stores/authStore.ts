@@ -74,7 +74,7 @@ export const useAuthStore = create<AuthState>()(
         signOut: () => {
             void apiSignOut().catch(() => { });
             localStorage.removeItem('auth_token');
-            // Refresh token cookie is cleared by the backend on POST /auth/signout
+            localStorage.removeItem('refresh_token');
             set({ token: null, user: null, error: null, isLoading: false, initialized: true });
         },
 
@@ -82,6 +82,7 @@ export const useAuthStore = create<AuthState>()(
             try {
                 const token = localStorage.getItem('auth_token');
                 if (!token) {
+                    localStorage.removeItem('refresh_token');
                     set({ token: null, user: null, initialized: true });
                     return;
                 }
@@ -105,10 +106,10 @@ export const useAuthStore = create<AuthState>()(
                 const data = await verifyEmail(token);
                 const accessToken = data.auth?.access_token;
 
-                if (!accessToken) throw new Error('No access token received');
+                if (!accessToken) throw new Error('Access token not received');
 
                 localStorage.setItem('auth_token', accessToken);
-                // Refresh token is set as HttpOnly cookie by the backend
+                localStorage.removeItem('refresh_token');
 
                 set({
                     token: accessToken,
@@ -127,18 +128,18 @@ export const useAuthStore = create<AuthState>()(
         refreshSession: async () => {
             try {
                 const { refreshToken: apiRefreshToken } = await import('@/shared/modules/auth/api');
-                // No token arg needed — HttpOnly cookie is sent automatically by the browser
                 const data = await apiRefreshToken();
 
                 const accessToken = data.auth?.access_token;
 
-                if (!accessToken) throw new Error('Failed to refresh session');
+                if (!accessToken) throw new Error('Failed to refresh access token');
 
                 localStorage.setItem('auth_token', accessToken);
+                localStorage.removeItem('refresh_token');
 
                 set({
                     token: accessToken,
-                    // If we don't have user object yet (silent refresh), keep existing
+                    // If we don't have user object yet (silent refresh), map it if it exists in response
                     user: data.id ? mapAuthResponseToUser(data) : useAuthStore.getState().user,
                     error: null,
                     initialized: true
@@ -171,10 +172,10 @@ export const useAuthStore = create<AuthState>()(
                 const data = await signIn(input);
                 const accessToken = data.auth?.access_token;
 
-                if (!accessToken) throw new Error('No access token received');
+                if (!accessToken) throw new Error('Access token not received');
 
                 localStorage.setItem('auth_token', accessToken);
-                // Refresh token is set as HttpOnly cookie by the backend
+                localStorage.removeItem('refresh_token');
 
                 set({
                     token: accessToken,

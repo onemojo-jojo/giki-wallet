@@ -273,13 +273,19 @@ func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 func setRefreshTokenCookie(w http.ResponseWriter, token string, maxAge int) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    token,
-		Path:     "/auth/refresh",
+		Name:  "refresh_token",
+		Value: token,
+		// Path must match the browser-visible URL, not the backend-internal path.
+		// Nginx strips /api/ before proxying, so the backend sees /auth/refresh,
+		// but the browser sees /api/auth/refresh. Using /api/auth/refresh ensures
+		// the cookie is scoped correctly and sent only to this one endpoint.
+		Path:     "/api/auth/refresh",
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
+		// SameSite=Lax (not Strict): Strict can suppress the cookie on same-site
+		// navigations in some browsers. Lax is the correct mode for refresh tokens.
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 

@@ -312,7 +312,3 @@ func setRefreshTokenCookie(w http.ResponseWriter, token string, maxAge int) {
 		SameSite: http.SameSiteLaxMode,
 	})
 }
-
-func clearRefreshTokenCookie(w http.ResponseWriter) {
-	setRefreshTokenCookie(w, "", -1) // MaxAge -1 = delete
-}

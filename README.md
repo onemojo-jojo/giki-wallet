@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">🏦 GIKI Wallet</h1>
+  <h1 align="center">GIKI Wallet</h1>
   <p align="center">
     A unified financial wallet & transport management system for the <a href="https://giki.edu.pk">GIKI</a> campus ecosystem.
     <br />
@@ -16,31 +16,31 @@
 </p>
 
 <p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#%EF%B8%8F-architecture">Architecture</a> •
-  <a href="#-getting-started">Getting Started</a> •
-  <a href="#-api-reference">API Reference</a> •
-  <a href="#-database-schema">Database</a> •
-  <a href="#-deployment">Deployment</a>
+  <a href="#features">Features</a> •
+  <a href="#architecture">Architecture</a> •
+  <a href="#getting-started">Getting Started</a> •
+  <a href="#api-reference">API Reference</a> •
+  <a href="#database-schema">Database</a> •
+  <a href="#deployment">Deployment</a>
 </p>
 
 ---
 
-## ✨ Features
+## Features
 
 | Domain | Capabilities |
 | :--- | :--- |
-| **💳 Wallet** | Personal G-Bux wallets, immutable append-only double-entry ledger, hash-chained integrity verification, balance snapshots |
-| **💰 Payments** | JazzCash gateway integration (mobile wallet + card), idempotent top-ups, async reconciliation with retry, refund support |
-| **🚌 Transport** | Route & schedule management, seat hold/confirm flow with TTL-based expiry, ticket booking with quota enforcement, trip lifecycle management |
-| **🔐 Auth** | JWT access + refresh token rotation, email verification, password reset, role-based access control (Student / Employee / Admin) |
-| **👤 Users** | Student & employee profiles, admin approval workflow for employees, GIKI-specific identity verification |
-| **📧 Notifications** | Async job queue for templated email delivery via Microsoft Graph API |
-| **📊 Admin** | Dashboard with revenue/liability reporting, gateway transaction audit logs, user management, system configuration, CSV exports |
+| **Wallet** | Personal G-Bux wallets, immutable append-only double-entry ledger, hash-chained integrity verification, balance snapshots |
+| **Payments** | JazzCash gateway integration (mobile wallet + card), idempotent top-ups, async reconciliation with retry, refund support |
+| **Transport** | Route & schedule management, seat hold/confirm flow with TTL-based expiry, ticket booking with quota enforcement, trip lifecycle management |
+| **Auth** | JWT access + refresh token rotation, email verification, password reset, role-based access control (Student / Employee / Admin) |
+| **Users** | Student & employee profiles, admin approval workflow for employees, GIKI-specific identity verification |
+| **Notifications** | Async job queue for templated email delivery via Microsoft Graph API |
+| **Admin** | Dashboard with revenue/liability reporting, gateway transaction audit logs, user management, system configuration, CSV exports |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 The system follows a **Strict Modular Monolith** pattern — a single deployable unit where each domain module owns its data access layer, business logic, and HTTP handlers. Cross-module communication happens only through defined Go service interfaces, never through shared database queries.
 
@@ -91,11 +91,11 @@ PostgreSQL schemas enforce logical data boundaries at the database level:
 | `giki_transport` | Logistics | `routes`, `stops`, `trips`, `tickets`, `trip_holds`, `route_weekly_schedules`, `quota_rules`, `driver` |
 | `giki_system` | System | `audit_logs`, `system_configs`, `jobs`, `feedback` |
 
-> 📐 The full database schema is available in [SCHEMA_DIAGRAM.dbml](SCHEMA_DIAGRAM.dbml) — paste it into [dbdiagram.io](https://dbdiagram.io) to visualize.
+> The full database schema is available in [SCHEMA_DIAGRAM.dbml](SCHEMA_DIAGRAM.dbml) — paste it into [dbdiagram.io](https://dbdiagram.io) to visualize.
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -150,7 +150,7 @@ Copy `.env.example` to `.env` and configure:
 
 ---
 
-## 🛠️ Development
+## Development
 
 ### Local Backend Development
 
@@ -213,7 +213,7 @@ make dev-rebuild       # docker compose up --build
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 All endpoints are served under `/api` via the Nginx reverse proxy. Authentication uses `Authorization: Bearer <token>` headers.
 
@@ -276,11 +276,11 @@ Requires authentication + role (`SUPER_ADMIN`, `TRANSPORT_ADMIN`, or `FINANCE_AD
 | `GET/PUT` | `/admin/settings` | System configuration |
 | `GET` | `/admin/worker/status` | Background worker status |
 
-> 📬 A complete Postman collection is included: [GIKI_Wallet_API.postman_collection.json](GIKI_Wallet_API.postman_collection.json)
+> A complete Postman collection is included: [GIKI_Wallet_API.postman_collection.json](GIKI_Wallet_API.postman_collection.json)
 
 ---
 
-## 🗄️ Database Schema
+## Database Schema
 
 The system uses **23 versioned migrations** managed by [Goose](https://github.com/pressly/goose), run automatically as a Docker init container before the backend starts.
 
@@ -301,7 +301,7 @@ cat SCHEMA_DIAGRAM.dbml
 
 ---
 
-## 🚢 Deployment
+## Deployment
 
 ### CI/CD Pipeline
 
@@ -335,7 +335,7 @@ The [deploy.sh](deploy.sh) script compares image digests before restarting — n
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 giki-wallet/
@@ -388,7 +388,7 @@ giki-wallet/
 
 ---
 
-## 🧩 Design Principles
+## Design Principles
 
 1. **Strict Domain Isolation** — Each module has its own SQLC queries, generated DB code, service layer, and HTTP handlers. No module directly imports another module's DB package.
 
@@ -402,6 +402,6 @@ giki-wallet/
 
 ---
 
-## 📄 License
+## License
 
 Copyright © GIKI Wallet Contributors. All rights reserved.

@@ -130,11 +130,13 @@ func (s *Service) InitiatePayment(ctx context.Context, payload TopUpRequest) (*T
 		response, err := s.checkTransactionStatus(ctx, transaction)
 
 		if err != nil {
-			if response.Status != PaymentStatusFailed {
+			if response != nil && response.Status != PaymentStatusFailed {
 				return response, nil
 			}
+			return nil, err
 		}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, commonerrors.Wrap(ErrDatabaseQuery, err)
 	}
 
 	amountPaisa := common.AmountToLowestUnit(payload.Amount)
@@ -285,8 +287,10 @@ func (s *Service) CompleteCardPayment(ctx context.Context, tx pgx.Tx, rForm url.
 	err = paymentQ.UpdateGatewayTransactionStatus(ctx, payment.UpdateGatewayTransactionStatusParams{
 		Status:            payment.CurrentStatus(paymentStatus),
 		TxnRefNo:          callback.TxnRefNo,
-		GatewayMessage:    pgtype.Text{String: callback.Message, Valid: true},
-		GatewayStatusCode: pgtype.Text{String: callback.ResponseCode, Valid: true},
+		GatewayMessage:    pgtype.Text{String: callback.Message, Valid: callback.Message != ""},
+		GatewayStatusCode: pgtype.Text{String: callback.ResponseCode, Valid: callback.ResponseCode != ""},
+		GatewayRrn:        pgtype.Text{String: callback.RRN, Valid: callback.RRN != ""},
+		RawResponse:       marshalGatewayResponse(callback.Raw),
 	})
 
 	if err != nil {
@@ -350,9 +354,27 @@ func (s *Service) initiateMWalletPayment(
 		TxnExpiryDateTime: txnExpiryDateTime,
 	}
 
-	_, err = s.gatewayClient.SubmitMWallet(ctx, mwRequest)
+	mwResponse, err := s.gatewayClient.SubmitMWallet(ctx, mwRequest)
 	if err != nil {
 		return nil, commonerrors.Wrap(ErrGatewayUnavailable, err)
+	}
+
+	mwStatus := GatewayStatusToPaymentStatus(mwResponse.Status)
+	if mwStatus == PaymentStatusSuccess || mwStatus == PaymentStatusFailed {
+		success, finalizeErr := s.finalizeGatewayStatus(ctx, gatewayTxn.TxnRefNo, mwResponse.Status, mwResponse.Message, mwResponse.ResponseCode, mwResponse.RRN, mwResponse.Raw)
+		if !success && mwStatus == PaymentStatusSuccess && finalizeErr != nil {
+			err := commonerrors.Wrap(ErrTransactionUpdate, fmt.Errorf("failed to finalize wallet transaction: %w", finalizeErr))
+			err = err.WithDetails("internal_error", finalizeErr.Error())
+			return nil, err
+		}
+		if finalizeErr != nil && mwStatus == PaymentStatusFailed {
+			return nil, commonerrors.Wrap(ErrTransactionUpdate, finalizeErr)
+		}
+		return MapMWalletToTopUpResult(gatewayTxn, mwResponse), nil
+	}
+
+	if _, persistErr := s.finalizeGatewayStatus(ctx, gatewayTxn.TxnRefNo, mwResponse.Status, mwResponse.Message, mwResponse.ResponseCode, mwResponse.RRN, mwResponse.Raw); persistErr != nil {
+		middleware.LogAppError(fmt.Errorf("failed to persist MWallet submit response for %s: %w", gatewayTxn.TxnRefNo, persistErr), "wallet-submit")
 	}
 
 	return s.checkTransactionStatus(ctx, gatewayTxn)
@@ -518,7 +540,7 @@ func (s *Service) checkTransactionStatus(
 		return MapInquiryToTopUpResult(existing, *inquiryResult), nil
 
 	case PaymentStatusPending, PaymentStatusUnknown:
-		if time.Since(existing.CreatedAt) > 120*time.Second {
+		if time.Since(existing.CreatedAt) > 180*time.Second {
 			// Cosmetic only: tell the user it timed out.
 			// DB stays PENDING so the background reconciler can
 			// verify the real status with JazzCash via retries.
@@ -583,17 +605,6 @@ func (s *Service) startPollingForTransaction(txRefNo string) {
 func (s *Service) handlePollingTimeout(paymentQ *payment.Queries, txRefNo string) {
 	cleanupCtx := context.Background()
 
-	err := paymentQ.UpdateGatewayTransactionStatus(cleanupCtx, payment.UpdateGatewayTransactionStatusParams{
-		Status:            payment.CurrentStatus(PaymentStatusFailed),
-		TxnRefNo:          txRefNo,
-		GatewayMessage:    pgtype.Text{String: "Polling timeout reached", Valid: true},
-		GatewayStatusCode: pgtype.Text{String: "TIMEOUT", Valid: true},
-	})
-
-	if err != nil {
-		middleware.LogAppError(commonerrors.Wrap(ErrTransactionUpdate, fmt.Errorf("failed to update status on timeout: %w", err)), "polling-"+txRefNo)
-	}
-
 	if err := paymentQ.ClearPollingStatus(cleanupCtx, txRefNo); err != nil {
 		middleware.LogAppError(commonerrors.Wrap(commonerrors.ErrDatabase, fmt.Errorf("failed to clear polling status: %w", err)), "polling-"+txRefNo)
 	}
@@ -621,7 +632,11 @@ func (s *Service) pollTransactionOnce(ctx context.Context, txRefNo string) bool 
 }
 
 func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inquiry *gateway.InquiryResponse) (bool, error) {
-	status := GatewayStatusToPaymentStatus(inquiry.Status)
+	return s.finalizeGatewayStatus(ctx, txRefNo, inquiry.Status, inquiry.Message, inquiryStatusCode(inquiry), inquiry.RRN, inquiry.Raw)
+}
+
+func (s *Service) finalizeGatewayStatus(ctx context.Context, txRefNo string, gwStatus gateway.Status, message, statusCode, rrn string, raw map[string]any) (bool, error) {
+	status := GatewayStatusToPaymentStatus(gwStatus)
 	isTerminal := status == PaymentStatusSuccess || status == PaymentStatusFailed
 
 	// 1. PHASE 1: Update Status (PERSISTENT & INDEPENDENT)
@@ -640,8 +655,10 @@ func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inqui
 		updateErr := paymentQ.UpdateGatewayTransactionStatus(ctx, payment.UpdateGatewayTransactionStatusParams{
 			Status:            payment.CurrentStatus(status),
 			TxnRefNo:          txRefNo,
-			GatewayMessage:    pgtype.Text{String: inquiry.Message, Valid: true},
-			GatewayStatusCode: pgtype.Text{String: inquiry.ResponseCode, Valid: true},
+			GatewayMessage:    pgtype.Text{String: message, Valid: message != ""},
+			GatewayStatusCode: pgtype.Text{String: statusCode, Valid: statusCode != ""},
+			GatewayRrn:        pgtype.Text{String: rrn, Valid: rrn != ""},
+			RawResponse:       marshalGatewayResponse(raw),
 		})
 		if updateErr != nil {
 			return updateErr
@@ -690,6 +707,27 @@ func (s *Service) finalizeTransaction(ctx context.Context, txRefNo string, inqui
 	}
 
 	return isTerminal, nil
+}
+
+func inquiryStatusCode(inquiry *gateway.InquiryResponse) string {
+	if inquiry.PaymentResponseCode != "" {
+		return inquiry.PaymentResponseCode
+	}
+	return inquiry.ResponseCode
+}
+
+func marshalGatewayResponse(raw map[string]any) []byte {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	payload, err := json.Marshal(raw)
+	if err != nil {
+		middleware.LogAppError(fmt.Errorf("failed to marshal gateway response: %w", err), "gateway-response")
+		return nil
+	}
+
+	return payload
 }
 
 // =============================================================================
@@ -1053,6 +1091,8 @@ func (s *Service) forceFailTransaction(ctx context.Context, txnRefNo string, rea
 		TxnRefNo:          txnRefNo,
 		GatewayMessage:    pgtype.Text{String: reason, Valid: true},
 		GatewayStatusCode: pgtype.Text{String: "RECONCILIATION_EXHAUSTED", Valid: true},
+		GatewayRrn:        pgtype.Text{},
+		RawResponse:       nil,
 	})
 	if err != nil {
 		middleware.LogAppError(fmt.Errorf("[reconciliation] failed to force-fail %s: %w", txnRefNo, err), "reconciliation-force-fail")

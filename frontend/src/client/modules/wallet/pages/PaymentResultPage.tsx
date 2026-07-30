@@ -4,24 +4,57 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle2, XCircle, Clock, ArrowRight, Home, RefreshCcw } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useWalletModuleStore } from '../store';
+import { getTransactionStatus } from '../api';
+import { PaymentStatus } from '../types';
 
 const PaymentResultPage = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { fetchBalance } = useWalletModuleStore();
+    const [resolvedStatus, setResolvedStatus] = useState<PaymentStatus | null>(null);
+    const [gatewayMessage, setGatewayMessage] = useState<string | null>(null);
 
     const txn = searchParams.get('txn');
     const path = window.location.pathname;
 
-    const isSuccess = path.includes('success');
-    const isPending = path.includes('pending');
-    const isFailed = path.includes('failed') || path.includes('error');
+    const pageIsSuccess = path.includes('success');
+    const pageIsPending = path.includes('pending');
+    const pageIsFailed = path.includes('failed') || path.includes('error');
+
+    const isSuccess = resolvedStatus === 'SUCCESS' || (!resolvedStatus && pageIsSuccess);
+    const isFailed = resolvedStatus === 'FAILED' || (!resolvedStatus && pageIsFailed);
+    const isPending = (!isSuccess && !isFailed) && (pageIsPending || resolvedStatus === 'PENDING' || resolvedStatus === 'UNKNOWN');
 
     useEffect(() => {
         if (isSuccess) {
             fetchBalance();
         }
     }, [isSuccess, fetchBalance]);
+
+    useEffect(() => {
+        if (!txn) return;
+
+        let cancelled = false;
+
+        getTransactionStatus(txn)
+            .then((result) => {
+                if (cancelled) return;
+                setResolvedStatus(result.status);
+                setGatewayMessage(result.message || null);
+                if (result.status === 'SUCCESS') {
+                    fetchBalance();
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setGatewayMessage(null);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [txn, fetchBalance]);
 
     return (
         <div className="max-w-md mx-auto pt-12 pb-20 px-4 min-h-[80vh] flex flex-col items-center justify-center">
@@ -56,7 +89,7 @@ const PaymentResultPage = () => {
                         </div>
                         <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Payment Failed</h1>
                         <p className="text-gray-500 mb-8 font-medium leading-relaxed">
-                            We couldn't process your payment. Please check your card details or try again with a different method.
+                            {gatewayMessage || "We couldn't process your payment. Please check your card details or try again with a different method."}
                         </p>
                     </div>
                 )}
@@ -68,7 +101,7 @@ const PaymentResultPage = () => {
                         </div>
                         <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Payment Pending</h1>
                         <p className="text-gray-500 mb-8 font-medium leading-relaxed">
-                            Your transaction is being verified by the gateway. This might take a few moments.
+                            {gatewayMessage || 'Your transaction is being verified by the gateway. This might take a few moments.'}
                         </p>
                     </div>
                 )}

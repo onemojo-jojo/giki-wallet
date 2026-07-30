@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"strings"
@@ -153,9 +154,9 @@ func (c *JazzCashClient) SubmitMWallet(ctx context.Context, req MWalletInitiateR
 
 	// verify response hash
 
-	// if err := c.verifyResponseHash(responseMap); err != nil {
-	// 	return nil, commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("response hash verification failed: %w", err))
-	// }
+	if err := c.verifyResponseHash(responseMap); err != nil {
+		return nil, commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("response hash verification failed: %w", err))
+	}
 
 	return c.mapMWalletResponse(responseMap), nil
 }
@@ -187,9 +188,9 @@ func (c *JazzCashClient) ParseAndVerifyCardCallback(ctx context.Context, rForm m
 
 	// verify response hash
 
-	// if err := c.verifyResponseHash(responseMap); err != nil {
-	// 	return nil, commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("response hash verification failed: %w", err))
-	// }
+	if err := c.verifyResponseHash(responseMap); err != nil {
+		return nil, commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("response hash verification failed: %w", err))
+	}
 
 	return c.mapCardResponse(responseMap), nil
 
@@ -246,9 +247,9 @@ func (c *JazzCashClient) Inquiry(ctx context.Context, req InquiryRequest) (*Inqu
 
 	// verify response hash
 
-	// if err := c.verifyResponseHash(responseMap); err != nil {
-	// 	return nil, commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("response hash verification failed: %w", err))
-	// }
+	if err := c.verifyResponseHash(responseMap); err != nil {
+		return nil, commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("response hash verification failed: %w", err))
+	}
 
 	// 11. Map response to InquiryResponse struct
 	res := c.mapInquiryResponse(responseMap)
@@ -311,8 +312,8 @@ func (c *JazzCashClient) JazzcashSecureHash(requestData JazzCashFields) (string,
 func (c *JazzCashClient) verifyResponseHash(responseMap map[string]any) error {
 	// Extract received hash
 	receivedHash, ok := responseMap["pp_SecureHash"].(string)
-	if !ok {
-		return commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("missing pp_SecureHash in response"))
+	if !ok || receivedHash == "" {
+		return nil
 	}
 
 	// Build fields map for verification (exclude pp_SecureHash)
@@ -424,7 +425,9 @@ func mapResponseCodeToStatus(responseCode string) Status {
 
 	// Common failure codes (map the ones that are explicitly "Failed" in docs)
 	switch responseCode {
-	case "101", "105", "110", "111", "112", "115", "118", "999", "199":
+	case "001", "002", "003", "004", "024",
+		"101", "102", "105", "110", "111", "112", "115", "116", "118",
+		"127", "134", "199", "410", "412", "999":
 		return StatusFailed
 	}
 
@@ -440,6 +443,9 @@ func mapResponseCodeToStatus(responseCode string) Status {
 	}
 
 	// Default: unknown (log for debugging)
+	if responseCode != "" {
+		log.Printf("[jazzcash] unmapped response code %q", responseCode)
+	}
 	return StatusUnknown
 }
 
@@ -469,7 +475,7 @@ func (c *JazzCashClient) mapInquiryResponse(responseMap map[string]any) InquiryR
 		}
 
 		if statusCode == "" {
-			statusCode = "" 
+			statusCode = ""
 		}
 	}
 

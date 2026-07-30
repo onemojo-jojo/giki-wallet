@@ -4,6 +4,9 @@ import { topUp, getTransactionStatus } from '../api';
 import { getErrorMessage } from '@/lib/errors';
 import { TopUpRequest } from '../types';
 
+export const JAZZCASH_PAYMENT_TIMEOUT_SECONDS = 180;
+const JAZZCASH_URGENT_PHASE_SECONDS = 60;
+
 export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast6: string) => {
 
     const {
@@ -28,9 +31,9 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
     // --- Derived State for UI ---
 
     // 1. Determine if we are in the "Hurry Up" phase (last 60 seconds)
-    const isUrgentPhase = timeLeft <= 60;
+    const isUrgentPhase = timeLeft <= JAZZCASH_URGENT_PHASE_SECONDS;
 
-    // 2. Logic to hide the timer during the first 40s (buffer), show it only for the last 60s
+    // 2. Logic to hide the timer during the buffer, show it only for the urgent phase
     const showTimer = status === 'processing' && isUrgentPhase;
 
     // 3. Dynamic Message based on the phase
@@ -38,10 +41,8 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
         if (status !== 'processing') return '';
 
         if (!isUrgentPhase) {
-            // First 40 seconds (TimeLeft: 100 -> 61)
             return "Request is sent. Please approve the payment request by entering your MPIN in the JazzCash app.";
         } else {
-            // Last 60 seconds (TimeLeft: 60 -> 0)
             return "Please hurry up and approve the payment!";
         }
     }, [status, isUrgentPhase]);
@@ -114,8 +115,7 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
         // IMMEDIATELY show the "Payment Request Sent" state
         setStatus('processing');
 
-        // CHANGE 1: Set total time to 100s (40s Buffer + 60s Urgent)
-        setTimeLeft(100);
+        setTimeLeft(JAZZCASH_PAYMENT_TIMEOUT_SECONDS);
 
         // Start countdown immediately
         timerIntervalRef.current = setInterval(() => {

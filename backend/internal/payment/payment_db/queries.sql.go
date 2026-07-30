@@ -691,14 +691,18 @@ UPDATE giki_wallet.gateway_transactions
 SET status = $1::current_status, 
     gateway_message = $2, 
     gateway_status_code = $3,
+    gateway_rrn = $4,
+    raw_response = $5,
     updated_at = NOW()
-WHERE txn_ref_no = $4
+WHERE txn_ref_no = $6
 `
 
 type UpdateGatewayTransactionStatusParams struct {
 	Status            CurrentStatus `json:"status"`
 	GatewayMessage    pgtype.Text   `json:"gateway_message"`
 	GatewayStatusCode pgtype.Text   `json:"gateway_status_code"`
+	GatewayRrn        pgtype.Text   `json:"gateway_rrn"`
+	RawResponse       []byte        `json:"raw_response"`
 	TxnRefNo          string        `json:"txn_ref_no"`
 }
 
@@ -707,6 +711,8 @@ func (q *Queries) UpdateGatewayTransactionStatus(ctx context.Context, arg Update
 		arg.Status,
 		arg.GatewayMessage,
 		arg.GatewayStatusCode,
+		arg.GatewayRrn,
+		arg.RawResponse,
 		arg.TxnRefNo,
 	)
 	return err

@@ -8,6 +8,8 @@ UPDATE giki_wallet.gateway_transactions
 SET status = sqlc.arg('status')::current_status, 
     gateway_message = sqlc.narg('gateway_message'), 
     gateway_status_code = sqlc.narg('gateway_status_code'),
+    gateway_rrn = sqlc.narg('gateway_rrn'),
+    raw_response = sqlc.narg('raw_response'),
     updated_at = NOW()
 WHERE txn_ref_no = sqlc.arg('txn_ref_no');
 

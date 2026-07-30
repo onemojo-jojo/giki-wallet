@@ -1,7 +1,7 @@
 import React from 'react';
 import { Phone, CheckCircle2, XCircle, Loader2, Smartphone, ShieldCheck, Clock } from 'lucide-react';
 import { toast } from '@/lib/toast';
-import { useJazzCashPayment } from '../hooks/useJazzCashPayment';
+import { JAZZCASH_PAYMENT_TIMEOUT_SECONDS, useJazzCashPayment } from '../hooks/useJazzCashPayment';
 
 interface JazzCashPaymentProps {
     amount: number;
@@ -84,9 +84,8 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({
 
     return (
         <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-gray-100 max-w-sm mx-auto overflow-hidden relative">
-            {/* Updated Progress Bar: Uses 100s scale instead of 60s */}
             <div className={`absolute top-0 left-0 w-full h-1 transition-all duration-1000 bg-primary ${status !== 'idle' ? 'opacity-100' : 'opacity-0'}`}
-                style={{ width: `${(timeLeft / 100) * 100}%` }} />
+                style={{ width: `${(timeLeft / JAZZCASH_PAYMENT_TIMEOUT_SECONDS) * 100}%` }} />
 
             <div className="relative z-10">
                 <div className="flex justify-between items-start mb-8">

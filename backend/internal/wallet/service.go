@@ -174,7 +174,13 @@ func (s *Service) ExecuteTransaction(
 
 func (s *Service) RefundTicket(ctx context.Context, tx pgx.Tx, userID uuid.UUID, amount int64, referenceID string, description string) error {
 	// 1. Get Transport Revenue Wallet
-	transportWalletID, err := s.GetSystemWalletByName(ctx, TransportSystemWallet, SystemWalletRevenue)
+	var transportWalletID uuid.UUID
+	var err error
+	if tx != nil {
+		transportWalletID, err = s.GetSystemWalletByNameInTx(ctx, tx, TransportSystemWallet, SystemWalletRevenue)
+	} else {
+		transportWalletID, err = s.GetSystemWalletByName(ctx, TransportSystemWallet, SystemWalletRevenue)
+	}
 	if err != nil {
 		return err
 	}
@@ -242,6 +248,22 @@ func (s *Service) GetWalletForUpdate(ctx context.Context, tx pgx.Tx, walletID uu
 		walletQ = s.q.WithTx(tx)
 	}
 	return walletQ.GetWalletForUpdate(ctx, walletID)
+}
+
+func (s *Service) GetSystemWalletByNameInTx(ctx context.Context, tx pgx.Tx, walletName SystemWalletName, walletType SystemWalletType) (uuid.UUID, error) {
+	if tx == nil {
+		return uuid.Nil, commonerrors.Wrap(ErrDatabase, fmt.Errorf("transaction is required"))
+	}
+
+	sysWallet, err := s.q.WithTx(tx).GetSystemWalletByName(ctx, wallet.GetSystemWalletByNameParams{
+		Name: common.StringToText(string(walletName)),
+		Type: common.StringToText(string(walletType)),
+	})
+	if err != nil {
+		return uuid.Nil, commonerrors.Wrap(ErrDatabase, err)
+	}
+
+	return sysWallet.ID, nil
 }
 
 func (s *Service) GetUserBalance(ctx context.Context, userID uuid.UUID) (*BalanceResponse, error) {

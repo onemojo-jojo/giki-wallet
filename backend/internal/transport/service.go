@@ -392,7 +392,6 @@ func (s *Service) ConfirmBatch(ctx context.Context, userID uuid.UUID, userRole s
 			}
 		}
 
-			
 		holds := make([]transport_db.GikiTransportTripHold, len(items))
 		uniqueTripIDs := make(map[uuid.UUID]struct{})
 		for i, item := range items {
@@ -409,7 +408,6 @@ func (s *Service) ConfirmBatch(ctx context.Context, userID uuid.UUID, userRole s
 			uniqueTripIDs[hold.TripID] = struct{}{}
 		}
 
-	
 		sortedTripIDs := make([]uuid.UUID, 0, len(uniqueTripIDs))
 		for id := range uniqueTripIDs {
 			sortedTripIDs = append(sortedTripIDs, id)
@@ -422,7 +420,6 @@ func (s *Service) ConfirmBatch(ctx context.Context, userID uuid.UUID, userRole s
 			}
 		}
 
-	
 		for i, item := range items {
 			hold := holds[i]
 
@@ -947,8 +944,14 @@ func (s *Service) BatchUpdateTripManualStatus(ctx context.Context, tripIDs []uui
 }
 
 func (s *Service) CancelTrip(ctx context.Context, tripID uuid.UUID) error {
-	return common.WithTransaction(ctx, s.dbPool, func(tx pgx.Tx) error {
+	var notifications []worker.TicketCancelledPayload
+
+	err := common.WithTransaction(ctx, s.dbPool, func(tx pgx.Tx) error {
 		qtx := s.q.WithTx(tx)
+
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", "trip-cancel:"+tripID.String()); err != nil {
+			return commonerrors.Wrap(commonerrors.ErrDatabase, err)
+		}
 
 		tickets, err := qtx.GetConfirmedTicketsForTrip(ctx, tripID)
 		if err != nil {
@@ -977,7 +980,7 @@ func (s *Service) CancelTrip(ctx context.Context, tripID uuid.UUID) error {
 
 			userEmailInfo, err := s.q.GetUserEmailAndName(ctx, ticket.UserID)
 			if err == nil {
-				_ = s.worker.Enqueue(ctx, "SEND_TICKET_CANCELLED", worker.TicketCancelledPayload{
+				notifications = append(notifications, worker.TicketCancelledPayload{
 					Email:        userEmailInfo.Email,
 					UserName:     userEmailInfo.Name,
 					TicketCode:   ticket.TicketCode,
@@ -1001,5 +1004,15 @@ func (s *Service) CancelTrip(ctx context.Context, tripID uuid.UUID) error {
 
 		return nil
 	})
-}
+	if err != nil {
+		return err
+	}
 
+	for _, notification := range notifications {
+		if err := s.worker.Enqueue(ctx, "SEND_TICKET_CANCELLED", notification); err != nil {
+			middleware.LogAppError(err, "admin-trip-cancellation-email")
+		}
+	}
+
+	return nil
+}

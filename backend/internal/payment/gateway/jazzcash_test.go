@@ -1,6 +1,9 @@
 package gateway
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -67,4 +70,76 @@ func TestVerifyResponseHashAllowsMissingHashForCompatibility(t *testing.T) {
 		FieldTxnRefNo:     "T123",
 		"pp_ResponseCode": "000",
 	}))
+}
+
+func TestParseAndVerifyCardCallbackAllowsHashMismatchForInquiry(t *testing.T) {
+	client := NewJazzCashClient("merchant", "password", "salt", "", "", "", "", "", "")
+
+	callback, err := client.ParseAndVerifyCardCallback(t.Context(), map[string]string{
+		FieldTxnRefNo:     "T123",
+		"pp_ResponseCode": "000",
+		FieldSecureHash:   "BADHASH",
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, StatusSuccess, callback.Status)
+}
+
+func TestInquiryRequiresMatchingSignedSuccess(t *testing.T) {
+	client := NewJazzCashClient("merchant", "password", "salt", "", "", "", "", "", "")
+	fields := JazzCashFields{
+		FieldMerchantID:          "merchant",
+		FieldTxnRefNo:            "T123",
+		FieldAmount:              "80000",
+		"pp_ResponseCode":        "000",
+		"pp_PaymentResponseCode": "000",
+	}
+	hash, err := client.JazzcashSecureHash(fields)
+	require.NoError(t, err)
+	fields[FieldSecureHash] = hash
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(fields)
+	}))
+	defer server.Close()
+	client.baseURL = server.URL
+	client.statusInquiryURL = "inquiry"
+	client.httpClient = server.Client()
+
+	inquiry, err := client.Inquiry(t.Context(), InquiryRequest{TxnRefNo: "T123"})
+	require.NoError(t, err)
+	require.Equal(t, StatusSuccess, inquiry.Status)
+	require.Equal(t, "T123", inquiry.Raw[FieldTxnRefNo])
+
+	fields[FieldSecureHash] = "BADHASH"
+	_, err = client.Inquiry(t.Context(), InquiryRequest{TxnRefNo: "T123"})
+	require.Error(t, err)
+
+	delete(fields, FieldSecureHash)
+	_, err = client.Inquiry(t.Context(), InquiryRequest{TxnRefNo: "T123"})
+	require.Error(t, err)
+}
+
+func TestInquiryRejectsMismatchedTransactionReference(t *testing.T) {
+	client := NewJazzCashClient("merchant", "password", "salt", "", "", "", "", "", "")
+	fields := JazzCashFields{
+		FieldMerchantID:          "merchant",
+		FieldTxnRefNo:            "OTHER",
+		"pp_ResponseCode":        "000",
+		"pp_PaymentResponseCode": "000",
+	}
+	hash, err := client.JazzcashSecureHash(fields)
+	require.NoError(t, err)
+	fields[FieldSecureHash] = hash
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(fields)
+	}))
+	defer server.Close()
+	client.baseURL = server.URL
+	client.statusInquiryURL = "inquiry"
+	client.httpClient = server.Client()
+
+	_, err = client.Inquiry(t.Context(), InquiryRequest{TxnRefNo: "T123"})
+	require.Error(t, err)
 }

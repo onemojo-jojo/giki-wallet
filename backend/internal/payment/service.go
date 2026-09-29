@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -262,7 +263,7 @@ func (s *Service) MarkAuditProcessed(ctx context.Context, auditID uuid.UUID) {
 	}
 }
 
-func (s *Service) CompleteCardPayment(ctx context.Context, tx pgx.Tx, rForm url.Values, auditID uuid.UUID) (*TopUpResult, error) {
+func (s *Service) VerifyCardPayment(ctx context.Context, rForm url.Values) (*gateway.CardCallback, error) {
 
 	callbackData := make(map[string]string)
 	for k := range rForm {
@@ -274,6 +275,49 @@ func (s *Service) CompleteCardPayment(ctx context.Context, tx pgx.Tx, rForm url.
 		return nil, commonerrors.Wrap(ErrGatewayUnavailable, err)
 	}
 
+	if callback.TxnRefNo == "" {
+		return nil, commonerrors.Wrap(ErrGatewayUnavailable, fmt.Errorf("callback is missing transaction reference"))
+	}
+
+	gatewayTxn, err := s.q.GetTransactionByTxnRefNo(ctx, callback.TxnRefNo)
+	if err != nil {
+		return nil, commonerrors.Wrap(ErrDatabaseQuery, err)
+	}
+	if gatewayTxn.PaymentMethod != string(PaymentMethodCard) {
+		return nil, commonerrors.Wrap(ErrGatewayUnavailable, fmt.Errorf("transaction is not a card payment"))
+	}
+
+	inquiry, err := s.gatewayClient.Inquiry(ctx, gateway.InquiryRequest{TxnRefNo: gatewayTxn.TxnRefNo})
+	if err != nil {
+		return nil, commonerrors.Wrap(ErrGatewayUnavailable, err)
+	}
+	if responseTxnRef, ok := inquiry.Raw[gateway.FieldTxnRefNo].(string); ok && responseTxnRef != gatewayTxn.TxnRefNo {
+		return nil, commonerrors.Wrap(ErrGatewayUnavailable, fmt.Errorf("inquiry transaction reference mismatch"))
+	}
+	if responseAmount, ok := inquiry.Raw[gateway.FieldAmount]; ok {
+		amount, parseErr := strconv.ParseInt(strings.TrimSpace(fmt.Sprint(responseAmount)), 10, 64)
+		if parseErr != nil || amount != gatewayTxn.Amount {
+			return nil, commonerrors.Wrap(ErrGatewayUnavailable, fmt.Errorf("inquiry amount does not match transaction"))
+		}
+	}
+
+	callback.Status = inquiry.Status
+	callback.ResponseCode = inquiry.PaymentResponseCode
+	if callback.ResponseCode == "" {
+		callback.ResponseCode = inquiry.ResponseCode
+	}
+	callback.Message = inquiry.Message
+	callback.RRN = inquiry.RRN
+	callback.Raw = inquiry.Raw
+	return callback, nil
+}
+
+func (s *Service) CompleteCardPayment(ctx context.Context, tx pgx.Tx, callback *gateway.CardCallback, auditID uuid.UUID) (*TopUpResult, error) {
+	var lockedID uuid.UUID
+	if err := tx.QueryRow(ctx, `SELECT id FROM giki_wallet.gateway_transactions WHERE txn_ref_no = $1 FOR UPDATE`, callback.TxnRefNo).Scan(&lockedID); err != nil {
+		return nil, commonerrors.Wrap(ErrDatabaseQuery, err)
+	}
+
 	paymentQ := s.q.WithTx(tx)
 
 	gatewayTxn, err := paymentQ.GetTransactionByTxnRefNo(ctx, callback.TxnRefNo)
@@ -283,18 +327,26 @@ func (s *Service) CompleteCardPayment(ctx context.Context, tx pgx.Tx, rForm url.
 	}
 
 	paymentStatus := GatewayStatusToPaymentStatus(callback.Status)
+	alreadySuccessful := gatewayTxn.Status == payment.CurrentStatusSUCCESS
+	if alreadySuccessful && paymentStatus != PaymentStatusSuccess {
+		paymentStatus = PaymentStatusSuccess
+		callback.Status = gateway.StatusSuccess
+		callback.Message = "Transaction has already completed"
+	}
 
-	err = paymentQ.UpdateGatewayTransactionStatus(ctx, payment.UpdateGatewayTransactionStatusParams{
-		Status:            payment.CurrentStatus(paymentStatus),
-		TxnRefNo:          callback.TxnRefNo,
-		GatewayMessage:    pgtype.Text{String: callback.Message, Valid: callback.Message != ""},
-		GatewayStatusCode: pgtype.Text{String: callback.ResponseCode, Valid: callback.ResponseCode != ""},
-		GatewayRrn:        pgtype.Text{String: callback.RRN, Valid: callback.RRN != ""},
-		RawResponse:       marshalGatewayResponse(callback.Raw),
-	})
+	if !alreadySuccessful {
+		err = paymentQ.UpdateGatewayTransactionStatus(ctx, payment.UpdateGatewayTransactionStatusParams{
+			Status:            payment.CurrentStatus(paymentStatus),
+			TxnRefNo:          callback.TxnRefNo,
+			GatewayMessage:    pgtype.Text{String: callback.Message, Valid: callback.Message != ""},
+			GatewayStatusCode: pgtype.Text{String: callback.ResponseCode, Valid: callback.ResponseCode != ""},
+			GatewayRrn:        pgtype.Text{String: callback.RRN, Valid: callback.RRN != ""},
+			RawResponse:       marshalGatewayResponse(callback.Raw),
+		})
 
-	if err != nil {
-		return nil, commonerrors.Wrap(ErrTransactionUpdate, err)
+		if err != nil {
+			return nil, commonerrors.Wrap(ErrTransactionUpdate, err)
+		}
 	}
 
 	switch paymentStatus {
@@ -360,14 +412,12 @@ func (s *Service) initiateMWalletPayment(
 	}
 
 	mwStatus := GatewayStatusToPaymentStatus(mwResponse.Status)
-	if mwStatus == PaymentStatusSuccess || mwStatus == PaymentStatusFailed {
-		success, finalizeErr := s.finalizeGatewayStatus(ctx, gatewayTxn.TxnRefNo, mwResponse.Status, mwResponse.Message, mwResponse.ResponseCode, mwResponse.RRN, mwResponse.Raw)
-		if !success && mwStatus == PaymentStatusSuccess && finalizeErr != nil {
-			err := commonerrors.Wrap(ErrTransactionUpdate, fmt.Errorf("failed to finalize wallet transaction: %w", finalizeErr))
-			err = err.WithDetails("internal_error", finalizeErr.Error())
-			return nil, err
-		}
-		if finalizeErr != nil && mwStatus == PaymentStatusFailed {
+	if mwStatus == PaymentStatusSuccess {
+		return s.checkTransactionStatus(ctx, gatewayTxn)
+	}
+	if mwStatus == PaymentStatusFailed {
+		_, finalizeErr := s.finalizeGatewayStatus(ctx, gatewayTxn.TxnRefNo, mwResponse.Status, mwResponse.Message, mwResponse.ResponseCode, mwResponse.RRN, mwResponse.Raw)
+		if finalizeErr != nil {
 			return nil, commonerrors.Wrap(ErrTransactionUpdate, finalizeErr)
 		}
 		return MapMWalletToTopUpResult(gatewayTxn, mwResponse), nil

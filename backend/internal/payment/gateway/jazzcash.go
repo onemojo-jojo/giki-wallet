@@ -155,7 +155,7 @@ func (c *JazzCashClient) SubmitMWallet(ctx context.Context, req MWalletInitiateR
 	// verify response hash
 
 	if err := c.verifyResponseHash(responseMap); err != nil {
-		log.Printf("[jazzcash] MWallet response hash verification failed: %v", err)
+		return nil, commonerrors.Wrap(commonerrors.ErrExternalService, fmt.Errorf("MWallet response hash verification failed: %w", err))
 	}
 
 	return c.mapMWalletResponse(responseMap), nil
@@ -188,8 +188,10 @@ func (c *JazzCashClient) ParseAndVerifyCardCallback(ctx context.Context, rForm m
 
 	// verify response hash
 
-	if err := c.verifyResponseHash(responseMap); err != nil {
-		log.Printf("[jazzcash] card callback response hash verification failed: %v", err)
+	if _, hasHash := responseMap[FieldSecureHash]; hasHash {
+		if err := c.verifyResponseHash(responseMap); err != nil {
+			log.Printf("[jazzcash] card callback hash mismatch; confirming transaction with status inquiry: %v", err)
+		}
 	}
 
 	return c.mapCardResponse(responseMap), nil
@@ -245,10 +247,21 @@ func (c *JazzCashClient) Inquiry(ctx context.Context, req InquiryRequest) (*Inqu
 		return nil, commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("failed to decode response: %w", err))
 	}
 
+	if hash, ok := responseMap[FieldSecureHash].(string); !ok || strings.TrimSpace(hash) == "" {
+		return nil, commonerrors.Wrap(commonerrors.ErrExternalService, fmt.Errorf("inquiry response is missing secure hash"))
+	}
+
 	// verify response hash
 
 	if err := c.verifyResponseHash(responseMap); err != nil {
-		log.Printf("[jazzcash] inquiry response hash verification failed: %v", err)
+		return nil, commonerrors.Wrap(commonerrors.ErrExternalService, fmt.Errorf("inquiry response hash verification failed: %w", err))
+	}
+
+	if txnRefNo, ok := responseMap[FieldTxnRefNo].(string); ok && txnRefNo != req.TxnRefNo {
+		return nil, commonerrors.Wrap(commonerrors.ErrExternalService, fmt.Errorf("inquiry response transaction reference mismatch"))
+	}
+	if merchantID, ok := responseMap[FieldMerchantID].(string); ok && merchantID != c.merchantID {
+		return nil, commonerrors.Wrap(commonerrors.ErrExternalService, fmt.Errorf("inquiry response merchant mismatch"))
 	}
 
 	// 11. Map response to InquiryResponse struct
@@ -313,6 +326,9 @@ func (c *JazzCashClient) verifyResponseHash(responseMap map[string]any) error {
 	// Extract received hash
 	receivedHash, ok := responseMap["pp_SecureHash"].(string)
 	if !ok || receivedHash == "" {
+		if _, exists := responseMap[FieldSecureHash]; exists {
+			return fmt.Errorf("secure hash has an invalid format")
+		}
 		return nil
 	}
 
@@ -331,9 +347,17 @@ func (c *JazzCashClient) verifyResponseHash(responseMap map[string]any) error {
 		return commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("failed to compute expected hash: %w", err))
 	}
 
-	// Verify
-	if receivedHash != expectedHash {
-		return commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("hash mismatch: received %s, expected %s", receivedHash, expectedHash))
+	// Compare decoded hashes in constant time and avoid logging either value.
+	receivedBytes, err := hex.DecodeString(strings.TrimSpace(receivedHash))
+	if err != nil {
+		return fmt.Errorf("secure hash has an invalid format")
+	}
+	expectedBytes, err := hex.DecodeString(expectedHash)
+	if err != nil {
+		return commonerrors.Wrap(commonerrors.ErrInternal, fmt.Errorf("failed to decode expected secure hash: %w", err))
+	}
+	if !hmac.Equal(receivedBytes, expectedBytes) {
+		return fmt.Errorf("secure hash mismatch")
 	}
 
 	return nil

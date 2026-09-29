@@ -93,6 +93,14 @@ func (h *Handler) CardCallBack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	callback, err := h.pService.VerifyCardPayment(r.Context(), r.Form)
+	if err != nil {
+		middleware.LogAppError(err, requestID)
+		h.pService.MarkAuditFailed(r.Context(), auditID, err.Error())
+		http.Redirect(w, r, h.pService.AppURL+"/payment/pending", http.StatusSeeOther)
+		return
+	}
+
 	tx, err := h.pService.dbPool.Begin(r.Context())
 
 	if err != nil {
@@ -103,7 +111,7 @@ func (h *Handler) CardCallBack(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
-	result, err := h.pService.CompleteCardPayment(r.Context(), tx, r.Form, auditID)
+	result, err := h.pService.CompleteCardPayment(r.Context(), tx, callback, auditID)
 
 	if err != nil {
 		middleware.LogAppError(err, requestID)
@@ -167,13 +175,13 @@ func (h *Handler) ListGatewayTransactions(w http.ResponseWriter, r *http.Request
 	response := make([]AdminGatewayTransaction, len(txns))
 	for i, txn := range txns {
 		response[i] = AdminGatewayTransaction{
-			TxnRefNo:      txn.TxnRefNo,
-			UserID:        txn.UserID,
-			UserName:      txn.UserName,
-			UserEmail:     txn.UserEmail,
-			Amount:        fmt.Sprintf("%d", txn.Amount),
-			Status:        PaymentStatus(txn.Status),
-			PaymentMethod: PaymentMethod(txn.PaymentMethod),
+			TxnRefNo:          txn.TxnRefNo,
+			UserID:            txn.UserID,
+			UserName:          txn.UserName,
+			UserEmail:         txn.UserEmail,
+			Amount:            fmt.Sprintf("%d", txn.Amount),
+			Status:            PaymentStatus(txn.Status),
+			PaymentMethod:     PaymentMethod(txn.PaymentMethod),
 			CreatedAt:         txn.CreatedAt.Format(time.RFC3339),
 			UpdatedAt:         txn.UpdatedAt.Format(time.RFC3339),
 			BillRefID:         txn.BillRefID,

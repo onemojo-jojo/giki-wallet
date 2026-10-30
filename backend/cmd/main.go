@@ -15,6 +15,7 @@ import (
 	"github.com/hash-walker/giki-wallet/internal/config_management"
 	"github.com/hash-walker/giki-wallet/internal/feedback"
 	"github.com/hash-walker/giki-wallet/internal/mailer"
+	"github.com/hash-walker/giki-wallet/internal/monitoring"
 	"github.com/hash-walker/giki-wallet/internal/payment"
 	"github.com/hash-walker/giki-wallet/internal/payment/gateway"
 	"github.com/hash-walker/giki-wallet/internal/transport"
@@ -58,7 +59,7 @@ func main() {
 		log.Fatalf("Unable to parse database connection string: %v", err)
 	}
 
-	dbConfig.MaxConns = 300
+	dbConfig.MaxConns = 60
 	dbConfig.MinConns = 10
 	dbConfig.MaxConnLifetime = 1 * time.Hour
 	dbConfig.MaxConnIdleTime = 30 * time.Minute
@@ -114,7 +115,10 @@ func main() {
 	feedbackHandler := feedback.NewHandler(feedbackService)
 
 	srv := api.NewServer(userHandler, authHandler, paymentHandler, transportHandler, walletHandler, newWorker, auditService, auditHandler, configHandler, feedbackHandler)
+	metrics := monitoring.New(pool)
+	srv.Router.Use(metrics.Middleware)
 	srv.MountRoutes()
+	srv.Router.Get("/metrics", metrics.ServeHTTP)
 
 	allowedOrigins := []string{strings.TrimRight(cfg.Server.AppURL, "/")}
 	if os.Getenv("ENV") != "production" {

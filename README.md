@@ -402,6 +402,12 @@ giki-wallet/
 
 ---
 
+# Monitoring
+
+The Compose stack includes Prometheus, PostgreSQL Exporter, and Node Exporter. Prometheus scrapes backend HTTP and pgxpool metrics, PostgreSQL statistics (including `pg_stat_statements`), and host metrics every 15 seconds. Prometheus is bound to `127.0.0.1:9090`; access it on the server or through an SSH tunnel. Alerts are evaluated in Prometheus and visible at `/alerts`. No external alert delivery is configured.
+
+The first database startup after enabling `pg_stat_statements` requires a PostgreSQL restart because it is loaded through `shared_preload_libraries`. The migration creates the extension. Apply the updated Compose configuration and migrations during deployment; pushing this repository alone only triggers the image build workflow.
+
 ## License
 
 Copyright © GIKI Wallet Contributors. All rights reserved.

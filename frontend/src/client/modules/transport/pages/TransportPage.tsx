@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useBlocker } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/shared/stores/authStore';
@@ -68,45 +68,53 @@ export const TransportPage = () => {
         }
     }, [activeHolds.length, timeLeft, tripsLoading, fetchData, initialized, activeHolds]);
 
-    // Auto-refresh when bookings open for scheduled trips
+    const nextBookingOpening = useMemo(() => {
+        const now = Date.now();
+        return allTrips.reduce<number | null>((soonest, trip) => {
+            if (trip.status !== 'SCHEDULED') return soonest;
+
+            const opensAt = new Date(trip.booking_opens_at).getTime();
+            if (!Number.isFinite(opensAt) || opensAt <= now) return soonest;
+            return soonest === null || opensAt < soonest ? opensAt : soonest;
+        }, null);
+    }, [allTrips]);
+
+    // Stagger refreshes so clients do not all hit the API at the same instant.
     useEffect(() => {
-        if (tripsLoading || !initialized) return;
+        if (tripsLoading || !initialized || nextBookingOpening === null) return;
 
-        // Find all scheduled trips and their booking open times
-        const scheduledTrips = allTrips.filter(trip => trip.status === 'SCHEDULED');
-        if (scheduledTrips.length === 0) return;
+        const maxJitterMs = 10_000;
+        const pollIntervalMs = 30_000;
+        const timeUntilOpen = Math.max(0, nextBookingOpening - Date.now());
 
-        const now = new Date().getTime();
-        const upcomingOpenings = scheduledTrips
-            .map(trip => ({
-                tripId: trip.id,
-                opensAt: new Date(trip.booking_opens_at).getTime()
-            }))
-            .filter(({ opensAt }) => opensAt > now)
-            .sort((a, b) => a.opensAt - b.opensAt);
-
-        if (upcomingOpenings.length === 0) return;
-
-        const nextOpening = upcomingOpenings[0];
-        const timeUntilOpen = nextOpening.opensAt - now;
-
-        // If booking opens within 5 minutes, poll every 30 seconds
-        if (timeUntilOpen <= 5 * 60 * 1000) {
-            const pollInterval = setInterval(() => {
-                void fetchData(false);
-            }, 30000); // Poll every 30 seconds
-
-            return () => clearInterval(pollInterval);
-        }
-
-        // Otherwise, set a timer to refresh exactly when booking opens
-        const openTimer = setTimeout(() => {
+        const openTimer = window.setTimeout(() => {
             void fetchData(false);
             toast.info('Booking now open!', { duration: 3000 });
-        }, timeUntilOpen);
+        }, timeUntilOpen + Math.random() * maxJitterMs);
 
-        return () => clearTimeout(openTimer);
-    }, [allTrips, tripsLoading, initialized, fetchData]);
+        if (timeUntilOpen <= 5 * 60 * 1000) {
+            let pollTimer: number | undefined;
+            let cancelled = false;
+
+            const schedulePoll = (delayMs: number) => {
+                pollTimer = window.setTimeout(() => {
+                    void fetchData(false);
+                    if (!cancelled) {
+                        schedulePoll(pollIntervalMs + Math.random() * maxJitterMs);
+                    }
+                }, delayMs);
+            };
+
+            schedulePoll(Math.random() * maxJitterMs);
+            return () => {
+                cancelled = true;
+                if (pollTimer !== undefined) window.clearTimeout(pollTimer);
+                window.clearTimeout(openTimer);
+            };
+        }
+
+        return () => window.clearTimeout(openTimer);
+    }, [nextBookingOpening, tripsLoading, initialized, fetchData]);
 
     const isStudent = user?.user_type === 'STUDENT';
 

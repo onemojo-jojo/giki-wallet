@@ -7,6 +7,7 @@ services:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
+    command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     volumes:
       - giki_wallet_data:/var/lib/postgresql/data
     ports:
@@ -26,7 +27,7 @@ services:
           memory: 2G
 
   migrations:
-    image: ghcr.io/hash-walker/giki-wallet-migrations:latest
+    image: ghcr.io/onemojo-jojo/giki-wallet-migrations:latest
     container_name: giki_wallet_migrations
     restart: "no"
     depends_on:
@@ -38,7 +39,7 @@ services:
       - GOOSE_VERBOSE=true
 
   backend:
-    image: ghcr.io/hash-walker/giki-wallet-backend:latest
+    image: ghcr.io/onemojo-jojo/giki-wallet-backend:latest
     container_name: giki_wallet_backend
     restart: always
     depends_on:
@@ -100,7 +101,7 @@ services:
           memory: 1G
 
   frontend:
-    image: ghcr.io/hash-walker/giki-wallet-frontend:latest
+    image: ghcr.io/onemojo-jojo/giki-wallet-frontend:latest
     container_name: giki_wallet_frontend
     restart: always
     volumes:
@@ -115,7 +116,7 @@ services:
           memory: 512M
 
   nginx:
-    image: ghcr.io/hash-walker/giki-wallet-nginx:latest
+    image: ghcr.io/onemojo-jojo/giki-wallet-nginx:latest
     container_name: giki_wallet_nginx
     restart: always
     ports:
@@ -142,10 +143,51 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    container_name: giki_wallet_prometheus
+    restart: always
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=30d", "--web.enable-lifecycle"]
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - backend
+      - postgres-exporter
+      - node-exporter
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    container_name: giki_wallet_postgres_exporter
+    restart: always
+    command: ["--datasource.uri=db:5432/${DB_NAME}?sslmode=${DB_SSL_MODE:-disable}", "--collector.stat_statements"]
+    environment:
+      DATA_SOURCE_USER: ${DB_USER}
+      DATA_SOURCE_PASS: ${DB_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: giki_wallet_node_exporter
+    restart: always
+    pid: host
+    command: ["--path.rootfs=/host", "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"]
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro,rslave
+
 volumes:
   giki_wallet_data:
     driver: local
   frontend_assets:
     driver: local
   nginx_logs:
+    driver: local
+  prometheus_data:
     driver: local

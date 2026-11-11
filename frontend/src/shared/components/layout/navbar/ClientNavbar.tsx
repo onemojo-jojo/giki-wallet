@@ -11,11 +11,6 @@ interface ClientNavbarProps {
     isAuthenticated: boolean;
 }
 
-/** v2-Web order: Home · Rides · Wallet · Tickets · Campus (the phone tab bar keeps Pass in the middle). */
-const WEB_ORDER = ['home', 'rides', 'wallet', 'pass', 'campus'] as const;
-
-/** On the web the centre "Pass" tab is the ticket list (the pass opens from there). */
-const webLink = (key: string, label: string, to: string) => (key === 'pass' ? { label: 'Tickets', to: '/tickets/all' } : { label, to });
 
 /**
  * Student web header (v2-Web): logo, Home · Rides · Wallet · Tickets · Campus, and
@@ -35,8 +30,8 @@ export const ClientNavbar = ({ onSignInClick, onSignUpClick, isAuthenticated }: 
                 </Link>
 
                 <nav aria-label="Main" className="flex-1 flex flex-wrap gap-1">
-                    {WEB_ORDER.map((key) => MAIN_TABS.find((t) => t.key === key)!).map((t) => {
-                        const { label, to } = webLink(t.key, t.label, t.to);
+                    {MAIN_TABS.map((t) => {
+                        const { label, to } = t;
                         const active = isTabActive(t, pathname);
                         return (
                             <Link

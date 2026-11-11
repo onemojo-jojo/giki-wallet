@@ -1,7 +1,7 @@
-import { Bus, GraduationCap, House, QrCode, Wallet, type LucideIcon } from 'lucide-react';
+import { Bus, GraduationCap, House, Ticket, Wallet, type LucideIcon } from 'lucide-react';
 
 export type MainTab = {
-    key: 'home' | 'rides' | 'pass' | 'wallet' | 'campus';
+    key: 'home' | 'rides' | 'wallet' | 'tickets' | 'campus';
     label: string;
     to: string;
     icon: LucideIcon;
@@ -10,14 +10,15 @@ export type MainTab = {
 };
 
 /**
- * The five main destinations. Used by the mobile tab bar and the desktop navbar
- * so both stay in sync. Pass sits in the middle and opens the user's tickets.
+ * The five main destinations, same order on the phone tab bar and the web header:
+ * Home · Rides · Wallet · Tickets · Campus.
  */
 export const MAIN_TABS: MainTab[] = [
     { key: 'home', label: 'Home', to: '/', icon: House },
     { key: 'rides', label: 'Rides', to: '/transport', icon: Bus },
-    { key: 'pass', label: 'My pass', to: '/tickets', icon: QrCode },
     { key: 'wallet', label: 'Wallet', to: '/wallet', icon: Wallet, match: ['/top-up', '/payment'] },
+    // The list; each ticket's pass (with its QR) opens from there. Lights up on /tickets/* too.
+    { key: 'tickets', label: 'Tickets', to: '/tickets/all', icon: Ticket, match: ['/tickets'] },
     { key: 'campus', label: 'Campus', to: '/campus', icon: GraduationCap, match: ['/about'] },
 ];
 

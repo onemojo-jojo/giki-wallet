@@ -2,10 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { MAIN_TABS, isTabActive } from '@/client/navigation';
 
-/**
- * Mobile tab bar: Home · Rides · [Pass] · Wallet · Campus.
- * The centre button opens the user's ride pass (tickets).
- */
+/** Mobile tab bar: five equal tabs — Home · Rides · Wallet · Tickets · Campus. */
 export const BottomNav = () => {
     const { pathname } = useLocation();
 
@@ -18,24 +15,6 @@ export const BottomNav = () => {
                 {MAIN_TABS.map((tab) => {
                     const active = isTabActive(tab, pathname);
                     const Icon = tab.icon;
-
-                    if (tab.key === 'pass') {
-                        return (
-                            <Link
-                                key={tab.key}
-                                to={tab.to}
-                                aria-label={tab.label}
-                                aria-current={active ? 'page' : undefined}
-                                className={cn(
-                                    'justify-self-center -mt-7 size-[58px] rounded-[20px] flex items-center justify-center',
-                                    'bg-ink text-volt ring-[5px] ring-background shadow-lg shadow-ink/20',
-                                    'transition-transform active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris'
-                                )}
-                            >
-                                <Icon className="size-[26px]" strokeWidth={2} />
-                            </Link>
-                        );
-                    }
 
                     return (
                         <Link

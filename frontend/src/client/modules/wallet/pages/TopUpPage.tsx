@@ -11,10 +11,12 @@ import { topUp } from '../api';
 import { TopUpRequest } from '../types';
 import { useTopUpLimit } from '../hooks/useTopUpLimit';
 import { formatAmount } from '../utils/transactionHelpers';
+import { forgetJazzCash, loadSavedJazzCash, maskMobile, type SavedJazzCash } from '../utils/savedJazzCash';
 import JazzCashPayment from '../components/JazzCashPayment';
 import { TopUpStepHeader } from '../components/TopUpStepHeader';
 
 type Step = 'amount' | 'method' | 'jazzcash';
+type MethodChoice = 'saved' | 'jazz' | 'card';
 
 /** Used only if /payment/limit can't be loaded (same fallback as before; the server enforces the real cap). */
 const FALLBACK_MAX_LIMIT = 800;
@@ -28,7 +30,9 @@ const TopUpPage = () => {
     const loadedLimit = useTopUpLimit();
     const maxLimit = loadedLimit ?? FALLBACK_MAX_LIMIT;
 
-    const { balance, fetchBalance, formData, setAmount, setMethod, resetFormData, resetPaymentState } = useWalletModuleStore();
+    const { balance, fetchBalance, formData, setAmount, setMethod, setMobileNumber, setCnicLastSix, resetFormData, resetPaymentState } = useWalletModuleStore();
+    const [saved, setSaved] = useState<SavedJazzCash | null>(loadSavedJazzCash);
+    const [choice, setChoice] = useState<MethodChoice>(() => (saved ? 'saved' : 'jazz'));
 
     useEffect(() => {
         void fetchBalance();
@@ -64,7 +68,7 @@ const TopUpPage = () => {
     const amountValid = amount >= 1 && !exceeds;
 
     const quickAmounts = useMemo(() => {
-        const base = [100, 200, 500].filter((v) => v < room);
+        const base = [50, 100, 150].filter((v) => v < room);
         return room > 0 ? [...base, room] : base;
     }, [room]);
 
@@ -116,9 +120,11 @@ const TopUpPage = () => {
                     amount={amount}
                     maxLimit={maxLimit}
                     currentBalance={balance}
+                    autoStart={choice === 'saved'}
                     onBack={() => setStep('method')}
                     onUseCard={() => {
                         setMethod('CARD');
+                        setChoice('card');
                         setStep('method');
                     }}
                 />
@@ -126,11 +132,37 @@ const TopUpPage = () => {
         );
     }
 
-    // ---- Step 2: payment method ----
+    // ---- Step 2: payment method (v2-TopUpMethod) ----
     if (step === 'method') {
-        const isJazz = formData.method === 'MWALLET';
+        const option = (selected: boolean) =>
+            cn(
+                'flex items-center gap-3.5 rounded-[20px] p-4 cursor-pointer bg-card',
+                selected ? 'border-2 border-iris bg-[#F6F4FF]' : 'border-[1.5px] border-input'
+            );
+
+        const pick = (c: MethodChoice) => {
+            setChoice(c);
+            setMethod(c === 'card' ? 'CARD' : 'MWALLET');
+        };
+
+        const go = () => {
+            if (choice === 'card') {
+                void handleCardPayment();
+                return;
+            }
+            if (choice === 'saved' && saved) {
+                setMobileNumber(saved.mobile);
+                setCnicLastSix(saved.cnicLast6);
+            } else if (saved && formData.mobile_number === saved.mobile && formData.cnic_last_six === saved.cnicLast6) {
+                // "Another number": clear the saved details, but keep anything the user typed before going Back.
+                setMobileNumber('');
+                setCnicLastSix('');
+            }
+            setStep('jazzcash');
+        };
+
         return (
-            <div className="max-w-xl mx-auto w-full flex flex-col gap-5 pt-1">
+            <div className="max-w-xl mx-auto w-full flex flex-col gap-[22px] pt-1">
                 <TopUpStepHeader title="Pay with" step={2} onBack={() => setStep('amount')} />
 
                 <div className="flex items-center justify-between bg-card rounded-2xl px-4 py-3.5">
@@ -138,65 +170,70 @@ const TopUpPage = () => {
                     <span className="font-display text-[22px] font-extrabold text-ink tabular">Rs {formatAmount(amount)}</span>
                 </div>
 
+                {saved && (
+                    <fieldset className="flex flex-col gap-3">
+                        <legend className="text-xs font-extrabold tracking-[0.08em] text-muted-foreground pb-2.5">SAVED</legend>
+                        <label className={option(choice === 'saved')}>
+                            <span className="size-12 rounded-2xl bg-[#C8102E] text-white flex items-center justify-center shrink-0 font-display font-extrabold text-[15px]">JC</span>
+                            <span className="flex-1 flex flex-col gap-0.5 min-w-0">
+                                <span className="text-base font-extrabold text-ink">JazzCash</span>
+                                <span className="font-mono text-[13px] text-[#4A4766]">{maskMobile(saved.mobile)}</span>
+                                <span className="text-xs font-bold text-mint">Last used · approve in the JazzCash app</span>
+                            </span>
+                            <input type="radio" name="method" checked={choice === 'saved'} onChange={() => pick('saved')} className="size-[22px] accent-iris shrink-0" />
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                forgetJazzCash();
+                                setSaved(null);
+                                pick('jazz');
+                            }}
+                            className="self-start h-9 px-1 text-xs font-extrabold text-muted-foreground hover:text-ink rounded-lg focus-visible:outline-2 focus-visible:outline-iris"
+                        >
+                            Forget this number
+                        </button>
+                    </fieldset>
+                )}
+
                 <fieldset className="flex flex-col gap-3">
-                    <legend className="sr-only">Payment method</legend>
-                    <label
-                        className={cn(
-                            'flex items-center gap-3.5 rounded-[20px] p-4 cursor-pointer bg-card',
-                            isJazz ? 'border-2 border-iris bg-[#F6F4FF]' : 'border-[1.5px] border-input'
-                        )}
-                    >
-                        <span className="size-12 rounded-2xl bg-[#C8102E] text-white flex items-center justify-center shrink-0">
+                    <legend className="text-xs font-extrabold tracking-[0.08em] text-muted-foreground pb-2.5">{saved ? 'OTHER WAYS' : 'PAY WITH'}</legend>
+                    <label className={option(choice === 'jazz')}>
+                        <span className={cn('size-12 rounded-2xl flex items-center justify-center shrink-0', saved ? 'bg-secondary text-ink' : 'bg-[#C8102E] text-white')}>
                             <Smartphone className="size-[22px]" aria-hidden="true" />
                         </span>
                         <span className="flex-1 flex flex-col gap-0.5">
-                            <span className="text-base font-extrabold text-ink">JazzCash</span>
-                            <span className="text-[13px] text-[#4A4766]">Mobile wallet · approve in the JazzCash app</span>
+                            <span className="text-base font-extrabold text-ink">{saved ? 'JazzCash, another number' : 'JazzCash'}</span>
+                            <span className="text-[13px] text-[#4A4766]">{saved ? 'Needs mobile number + CNIC last 6' : 'Mobile wallet · approve in the JazzCash app'}</span>
                         </span>
-                        <input
-                            type="radio"
-                            name="method"
-                            checked={isJazz}
-                            onChange={() => setMethod('MWALLET')}
-                            className="size-[22px] accent-iris shrink-0"
-                        />
+                        <input type="radio" name="method" checked={choice === 'jazz'} onChange={() => pick('jazz')} className="size-[22px] accent-iris shrink-0" />
                     </label>
-                    <label
-                        className={cn(
-                            'flex items-center gap-3.5 rounded-[20px] p-4 cursor-pointer bg-card',
-                            !isJazz ? 'border-2 border-iris bg-[#F6F4FF]' : 'border-[1.5px] border-input'
-                        )}
-                    >
+                    <label className={option(choice === 'card')}>
                         <span className="size-12 rounded-2xl bg-secondary text-ink flex items-center justify-center shrink-0">
                             <CreditCard className="size-[22px]" aria-hidden="true" />
                         </span>
                         <span className="flex-1 flex flex-col gap-0.5">
                             <span className="text-base font-extrabold text-ink">Debit or credit card</span>
-                            <span className="text-[13px] text-[#4A4766]">Opens the secure JazzCash checkout page</span>
+                            <span className="text-[13px] text-[#4A4766]">Opens a secure JazzCash checkout page</span>
                         </span>
-                        <input
-                            type="radio"
-                            name="method"
-                            checked={!isJazz}
-                            onChange={() => setMethod('CARD')}
-                            className="size-[22px] accent-iris shrink-0"
-                        />
+                        <input type="radio" name="method" checked={choice === 'card'} onChange={() => pick('card')} className="size-[22px] accent-iris shrink-0" />
                     </label>
                 </fieldset>
 
-                <p className="flex items-center justify-center gap-1.5 text-xs text-[#4A4766]">
-                    <Lock className="size-3.5 text-mint" aria-hidden="true" />
-                    GIKI Wallet never sees your PIN or card number.
-                </p>
-
-                <button
-                    type="button"
-                    onClick={() => (isJazz ? setStep('jazzcash') : void handleCardPayment())}
-                    disabled={isLoading || !amountValid}
-                    className="h-14 rounded-[18px] bg-primary text-primary-foreground text-base font-extrabold disabled:bg-secondary disabled:text-[#6E6B88] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
-                >
-                    {isJazz ? 'Continue' : isLoading ? 'Processing...' : 'Proceed to Payment'}
-                </button>
+                <div className="mt-auto flex flex-col gap-3">
+                    <p className="flex items-center justify-center gap-1.5 text-xs text-[#4A4766]">
+                        <Lock className="size-3.5 text-mint" aria-hidden="true" />
+                        No fees. GIKI Wallet never sees your PIN or card.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={go}
+                        disabled={isLoading || !amountValid}
+                        className="h-14 rounded-[18px] bg-primary text-primary-foreground text-base font-extrabold disabled:bg-secondary disabled:text-[#6E6B88] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                    >
+                        {choice === 'saved' ? 'Send request to JazzCash' : choice === 'jazz' ? 'Continue' : isLoading ? 'Processing...' : 'Proceed to Payment'}
+                    </button>
+                </div>
             </div>
         );
     }
@@ -233,7 +270,9 @@ const TopUpPage = () => {
                 <p id="topup-amount-help" className={cn('text-sm text-center', exceeds ? 'text-coral font-bold' : 'text-[#4A4766]')}>
                     {exceeds
                         ? `That's over your Rs ${formatAmount(maxLimit)} cap. You can add up to Rs ${formatAmount(room)}.`
-                        : `Max balance: Rs ${formatAmount(maxLimit)} · you can add Rs ${formatAmount(room)}`}
+                        : amount > 0
+                          ? `Balance after: Rs ${formatAmount(balance + amount)}${balance + amount >= maxLimit ? " · that's your cap" : ` · cap Rs ${formatAmount(maxLimit)}`}`
+                          : `Max balance: Rs ${formatAmount(maxLimit)} · you can add Rs ${formatAmount(room)}`}
                 </p>
             </div>
 
@@ -269,7 +308,7 @@ const TopUpPage = () => {
                 Continue
             </button>
 
-            {isPhone && <Keypad onKey={typeDigit} onDelete={deleteDigit} className="-mx-1" />}
+            {isPhone && <Keypad onKey={typeDigit} onDelete={deleteDigit} className="-mx-1 mb-10" />}
         </div>
     );
 };

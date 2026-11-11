@@ -5,6 +5,7 @@ import { getErrorMessage } from '@/lib/errors';
 import { TopUpRequest } from '../types';
 
 export const JAZZCASH_PAYMENT_TIMEOUT_SECONDS = 180;
+export const JAZZCASH_TIMEOUT_MESSAGE = 'Payment timed out. Please try again.';
 const JAZZCASH_URGENT_PHASE_SECONDS = 60;
 
 export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast6: string) => {
@@ -121,7 +122,7 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
         timerIntervalRef.current = setInterval(() => {
             setTimeLeft((prev: number) => {
                 if (prev <= 1) {
-                    handleFailure("Payment timed out. Please try again.");
+                    handleFailure(JAZZCASH_TIMEOUT_MESSAGE);
                     return 0;
                 }
                 return prev - 1;

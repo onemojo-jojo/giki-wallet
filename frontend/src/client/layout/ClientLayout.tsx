@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
-import { Wallet, MessageSquarePlus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { MessageSquarePlus } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { LogoMark } from '@/shared/components/ui/Logo';
 import { ClientNavbar, Footer } from '@/shared/components/layout';
 import { BottomNav } from '@/shared/components/layout/BottomNav';
 import { TransactionHistory } from '@/client/modules/wallet/components/TransactionHistory';
@@ -14,6 +15,14 @@ import { toast } from '@/lib/toast';
 interface ClientLayoutProps {
     children: ReactNode;
 }
+
+const getInitials = (name: string) =>
+    name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? '')
+        .join('') || '?';
 
 export const ClientLayout = ({ children }: ClientLayoutProps) => {
     const navigate = useNavigate();
@@ -69,7 +78,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
             onMyTicketsClick={handleMyTicketsClick}
             onMyAccountClick={handleMyAccountClick}
         >
-            <div className="min-h-screen flex flex-col bg-background font-inter pb-20 md:pb-0 transition-colors duration-500">
+            <div className="min-h-screen flex flex-col bg-background font-body pb-28 md:pb-0">
                 <div className="hidden md:block">
                     <ClientNavbar
                         onMyBookingsClick={handleMyTicketsClick}
@@ -82,17 +91,28 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                 </div>
 
                 {/* Mobile Top Bar */}
-                <div className="md:hidden sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100/40 h-16 flex items-center justify-center px-4 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-full bg-accent/5 blur-xl pointer-events-none" />
-                    <div className="flex items-center gap-2.5">
-                        <div className="bg-primary/5 p-2 rounded-xl border border-primary/10 shadow-inner">
-                            <Wallet className="w-5 h-5 text-primary" />
-                        </div>
-                        <span className="font-black text-xl text-gray-900 tracking-tighter">
-                            GIKI <span className="text-accent">Wallet</span>
-                        </span>
-                    </div>
-                </div>
+                <header className="md:hidden sticky top-0 z-40 bg-background/90 backdrop-blur-xl border-b border-line h-16 flex items-center justify-between px-4">
+                    <Link to="/" className="flex items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-iris">
+                        <LogoMark size={34} />
+                        <span className="font-display font-extrabold text-xl text-ink tracking-tight">GIKI Wallet</span>
+                    </Link>
+                    {user ? (
+                        <Link
+                            to="/account"
+                            aria-label="My account"
+                            className="size-11 rounded-[14px] bg-iris text-white font-display font-bold text-[15px] flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                        >
+                            {getInitials(user.name)}
+                        </Link>
+                    ) : (
+                        <Link
+                            to="/auth/sign-in"
+                            className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-extrabold flex items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                        >
+                            Sign in
+                        </Link>
+                    )}
+                </header>
 
                 <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full px-4 lg:px-6 py-4 md:py-12">
                     {children}
@@ -119,7 +139,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
 
                 {/* Floating Feedback Trigger */}
                 {!!user && (
-                    <div className="fixed bottom-20 right-4 md:bottom-8 md:right-8 z-50">
+                    <div className="fixed bottom-[104px] right-4 md:bottom-8 md:right-8 z-50">
                         <Button
                             onClick={openFeedback}
                             className="rounded-full shadow-lg h-12 w-12 p-0 bg-primary hover:bg-primary/90 text-white"

@@ -30,6 +30,8 @@ import TopUpPage from '@/client/modules/wallet/pages/TopUpPage';
 import PaymentResultPage from '@/client/modules/wallet/pages/PaymentResultPage';
 import { TicketsPage } from '@/client/modules/transport/pages/TicketsPage';
 import BookingConfirmationPage from '@/client/modules/transport/pages/BookingConfirmationPage';
+import { WalletTabPage } from '@/client/modules/wallet/pages/WalletTabPage';
+import { CampusPage } from '@/client/modules/campus/pages/CampusPage';
 import PassengerDetailsPage from '@/client/modules/transport/pages/PassengerDetailsPage';
 
 // Shared components
@@ -127,6 +129,28 @@ const router = createBrowserRouter([
                 <AboutPage />
             </ClientLayout>
         ),
+    },
+    {
+        path: '/campus',
+        element: (
+            <ClientLayout>
+                <CampusPage />
+            </ClientLayout>
+        ),
+    },
+    {
+        path: '/wallet',
+        element: (
+            <ClientLayout>
+                <RequireAuth />
+            </ClientLayout>
+        ),
+        children: [
+            {
+                index: true,
+                element: <WalletTabPage />,
+            },
+        ],
     },
     {
         path: '/transport',

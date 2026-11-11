@@ -31,6 +31,7 @@ import PaymentResultPage from '@/client/modules/wallet/pages/PaymentResultPage';
 import { TicketsPage } from '@/client/modules/transport/pages/TicketsPage';
 import BookingConfirmationPage from '@/client/modules/transport/pages/BookingConfirmationPage';
 import { WalletTabPage } from '@/client/modules/wallet/pages/WalletTabPage';
+import { ReceiptPage } from '@/client/modules/wallet/pages/ReceiptPage';
 import { CampusPage } from '@/client/modules/campus/pages/CampusPage';
 import PassengerDetailsPage from '@/client/modules/transport/pages/PassengerDetailsPage';
 import ReviewPage from '@/client/modules/transport/pages/ReviewPage';
@@ -151,6 +152,10 @@ const router = createBrowserRouter([
             {
                 index: true,
                 element: <WalletTabPage />,
+            },
+            {
+                path: 'receipt/:id',
+                element: <ReceiptPage />,
             },
         ],
     },

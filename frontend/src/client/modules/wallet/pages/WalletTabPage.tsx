@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Plus, RotateCcw } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 import { useWalletModuleStore } from '../store';
-import { useTopUpLimit } from '../hooks/useTopUpLimit';
 import { Transaction, TransactionFilter, formatAmount, matchesFilter, toTransaction } from '../utils/transactionHelpers';
 import { TransactionList } from '../components/TransactionList';
-import { TransactionReceipt } from '../components/TransactionReceipt';
 
 
 const TZ = 'Asia/Karachi';
@@ -25,10 +23,9 @@ export const WalletTabPage = () => {
     const { balance, transactions, isDataLoading, isHistoryLoading, historyError, fetchBalance, fetchHistory } = useWalletModuleStore();
     // Show the skeleton (not "No transactions yet") until the first history request has finished.
     const [historyLoaded, setHistoryLoaded] = useState(false);
-    const maxLimit = useTopUpLimit();
     const [showBalance, setShowBalance] = useState(true);
     const [filter, setFilter] = useState<TransactionFilter>('all');
-    const [selected, setSelected] = useState<Transaction | null>(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
         void fetchBalance();
@@ -57,7 +54,6 @@ export const WalletTabPage = () => {
         return { name: formatInTimeZone(new Date(), TZ, 'MMMM'), spent, added };
     }, [mapped]);
 
-    const capPercent = maxLimit ? Math.min(100, Math.max(0, (balance / maxLimit) * 100)) : null;
 
     const refresh = () => {
         void fetchBalance();
@@ -73,7 +69,25 @@ export const WalletTabPage = () => {
             <section aria-label="Balance" className="bg-card rounded-3xl p-[18px] flex flex-col gap-3.5">
                 <div className="flex items-end justify-between gap-3">
                     <div className="flex flex-col gap-1">
-                        <span className="text-[13px] font-bold text-muted-foreground">G-Bux balance</span>
+                        <span className="flex items-center gap-1">
+                            <span className="text-[13px] font-bold text-muted-foreground whitespace-nowrap">G-Bux balance</span>
+                            <button
+                                type="button"
+                                onClick={() => setShowBalance((v) => !v)}
+                                aria-label={showBalance ? 'Hide balance' : 'Show balance'}
+                                className="size-8 rounded-[10px] text-muted-foreground hover:text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                            >
+                                {showBalance ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={refresh}
+                                aria-label="Refresh balance and history"
+                                className="size-8 rounded-[10px] text-muted-foreground hover:text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                            >
+                                <RotateCcw className={cn('size-4', (isDataLoading || isHistoryLoading) && 'animate-spin')} />
+                            </button>
+                        </span>
                         <span className={cn('font-display font-extrabold text-[40px] leading-none tracking-tight tabular text-ink', isDataLoading && 'opacity-70')} aria-live={showBalance ? 'polite' : 'off'}>
                             {showBalance ? `Rs ${formatAmount(balance)}` : 'Rs ••••'}
                         </span>
@@ -85,39 +99,6 @@ export const WalletTabPage = () => {
                         <Plus className="size-[18px]" strokeWidth={2.4} aria-hidden="true" />
                         Add money
                     </Link>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {capPercent !== null && maxLimit && showBalance ? (
-                        <div className="flex-1 flex items-center gap-2.5 min-w-0">
-                            <div
-                                role="img"
-                                aria-label={`Rs ${formatAmount(balance)} of Rs ${formatAmount(maxLimit)} wallet cap`}
-                                className="flex-1 max-w-40 h-1.5 rounded-full bg-secondary overflow-hidden"
-                            >
-                                <div className="h-full rounded-full bg-iris" style={{ width: `${capPercent}%` }} />
-                            </div>
-                            <span className="text-xs text-muted-foreground truncate">Cap Rs {formatAmount(maxLimit)}</span>
-                        </div>
-                    ) : (
-                        <span className="flex-1" />
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setShowBalance((v) => !v)}
-                        aria-label={showBalance ? 'Hide balance' : 'Show balance'}
-                        className="size-11 rounded-[14px] bg-secondary text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
-                    >
-                        {showBalance ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={refresh}
-                        aria-label="Refresh balance and history"
-                        className="size-11 rounded-[14px] bg-secondary text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
-                    >
-                        <RotateCcw className={cn('size-5', (isDataLoading || isHistoryLoading) && 'animate-spin')} />
-                    </button>
                 </div>
 
                 {showBalance && (
@@ -184,10 +165,9 @@ export const WalletTabPage = () => {
                     </span>
                 </div>
             ) : (
-                <TransactionList transactions={visible} onSelect={setSelected} />
+                <TransactionList transactions={visible} onSelect={(t: Transaction) => navigate(`/wallet/receipt/${t.id}`)} />
             )}
 
-            <TransactionReceipt transaction={selected} onClose={() => setSelected(null)} />
         </div>
     );
 };

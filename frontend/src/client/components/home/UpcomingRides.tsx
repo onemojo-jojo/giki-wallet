@@ -80,7 +80,7 @@ export const UpcomingRides = () => {
                 <h2 id="home-upcoming" className="font-display font-bold text-xl text-ink">
                     Your rides
                 </h2>
-                <Link to="/tickets" className="text-[13px] font-extrabold text-iris-strong hover:underline">
+                <Link to="/tickets/all" className="text-[13px] font-extrabold text-iris-strong hover:underline">
                     All tickets
                 </Link>
             </div>
@@ -88,7 +88,7 @@ export const UpcomingRides = () => {
             {upcoming.map((t) => (
                 <Link
                     key={t.ticket_id}
-                    to="/tickets"
+                    to={`/tickets/${t.ticket_id}`}
                     className="flex items-center gap-3.5 bg-card rounded-[20px] p-3.5 hover:shadow-md transition-shadow focus-visible:outline-2 focus-visible:outline-iris"
                 >
                     <DateChip iso={t.departure_time} tone="iris" />

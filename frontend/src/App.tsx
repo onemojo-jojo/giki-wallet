@@ -29,6 +29,7 @@ import { TransportPage } from '@/client/modules/transport/pages/TransportPage';
 import TopUpPage from '@/client/modules/wallet/pages/TopUpPage';
 import PaymentResultPage from '@/client/modules/wallet/pages/PaymentResultPage';
 import { TicketsPage } from '@/client/modules/transport/pages/TicketsPage';
+import PassPage from '@/client/modules/transport/pages/PassPage';
 import BookingConfirmationPage from '@/client/modules/transport/pages/BookingConfirmationPage';
 import { WalletTabPage } from '@/client/modules/wallet/pages/WalletTabPage';
 import { ReceiptPage } from '@/client/modules/wallet/pages/ReceiptPage';
@@ -227,7 +228,15 @@ const router = createBrowserRouter([
         children: [
             {
                 index: true,
+                element: <PassPage />,
+            },
+            {
+                path: 'all',
                 element: <TicketsPage />,
+            },
+            {
+                path: ':id',
+                element: <PassPage />,
             },
         ],
     },

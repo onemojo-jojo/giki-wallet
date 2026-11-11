@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { BalanceHero } from '@/client/components/home/BalanceHero';
 import { UpcomingRides } from '@/client/components/home/UpcomingRides';
 import { CampusShortcuts } from '@/client/components/home/CampusShortcuts';
-import { LogoMark } from '@/shared/components/ui/Logo';
+import { TalariaMark } from '@/shared/components/ui/Logo';
 import { useAuthStore } from '@/shared/stores/authStore';
 import { useIsPhone } from '@/shared/hooks/useIsPhone';
 import { WebBalanceCard } from '@/client/components/home/web/WebBalanceCard';
@@ -11,8 +11,8 @@ import { RecentActivity } from '@/client/components/home/web/RecentActivity';
 
 const SignedOutHero = () => (
     <section className="-mx-4 -mt-4 md:mx-0 md:mt-0 relative overflow-hidden rounded-b-[32px] md:rounded-[28px] bg-ink text-white px-6 pt-7 pb-7 flex flex-col gap-4">
-        <h1 className="sr-only">GIKI Wallet</h1>
-        <LogoMark size={44} tone="volt" />
+        <h1 className="sr-only">Talaria</h1>
+        <TalariaMark size={44} />
         <p className="font-display font-extrabold text-[34px] leading-[1.02] tracking-tight">
             Campus,
             <br />

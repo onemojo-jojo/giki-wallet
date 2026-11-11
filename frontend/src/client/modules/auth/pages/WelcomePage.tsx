@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { Bus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LogoMark } from '@/shared/components/ui/Logo';
+import { TalariaMark } from '@/shared/components/ui/Logo';
 import { useAuthStore } from '@/shared/stores/authStore';
 
 const SLIDES = [
@@ -76,8 +76,8 @@ export const WelcomePage = () => {
                 </svg>
 
                 <div className="relative flex items-center gap-2.5">
-                    <LogoMark size={36} tone="volt" />
-                    <span className="font-display font-extrabold text-xl tracking-[-0.02em]">GIKI Wallet</span>
+                    <TalariaMark size={36} />
+                    <span className="font-display font-extrabold text-xl tracking-[-0.02em]">Talaria</span>
                 </div>
 
                 {/* Illustration: what the app does, as three floating chips. */}

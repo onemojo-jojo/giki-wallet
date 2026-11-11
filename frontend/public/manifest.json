@@ -1,24 +1,30 @@
 {
-    "short_name": "GIKI Wallet",
-    "name": "GIKI Wallet",
-    "description": "Secure & Intelligent Payments for GIKI",
+    "short_name": "Talaria",
+    "name": "Talaria",
+    "description": "G-Bux, campus rides and your boarding pass — for GIKI",
     "icons": [
         {
-            "src": "logo-mark.svg",
+            "src": "talaria-mark.svg",
             "type": "image/svg+xml",
             "sizes": "any",
             "purpose": "any"
         },
         {
-            "src": "logo_v2.png",
+            "src": "talaria-192.png",
             "type": "image/png",
-            "sizes": "1024x1024",
+            "sizes": "192x192",
             "purpose": "any"
         },
         {
-            "src": "logo_v2.png",
+            "src": "talaria-512.png",
             "type": "image/png",
-            "sizes": "1024x1024",
+            "sizes": "512x512",
+            "purpose": "any"
+        },
+        {
+            "src": "talaria-maskable-512.png",
+            "type": "image/png",
+            "sizes": "512x512",
             "purpose": "maskable"
         }
     ],

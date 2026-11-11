@@ -86,12 +86,12 @@ export const ReceiptPage = () => {
     };
 
     const share = async () => {
-        const text = [`GIKI Wallet receipt`, `${title}: ${amountText}`, when, t.description, t.referenceId ? `Ref ${t.referenceId}` : '', typeof t.balanceAfter === 'number' ? `Balance after: Rs ${formatAmount(t.balanceAfter)}` : '']
+        const text = [`Talaria receipt`, `${title}: ${amountText}`, when, t.description, t.referenceId ? `Ref ${t.referenceId}` : '', typeof t.balanceAfter === 'number' ? `Balance after: Rs ${formatAmount(t.balanceAfter)}` : '']
             .filter(Boolean)
             .join('\n');
         try {
             if (navigator.share) {
-                await navigator.share({ title: 'GIKI Wallet receipt', text });
+                await navigator.share({ title: 'Talaria receipt', text });
             } else {
                 await navigator.clipboard.writeText(text);
                 toast.success('Receipt copied — paste it anywhere');

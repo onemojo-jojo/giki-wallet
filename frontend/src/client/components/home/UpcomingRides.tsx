@@ -5,10 +5,10 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { useTransportStore } from '@/client/modules/transport/store';
 import { getWeeklySummary } from '@/client/modules/transport/api';
 import type { MyTicket, Trip } from '@/client/modules/transport/validators';
-import { formatTime12 } from '@/client/modules/transport/utils';
 import { useAuthStore } from '@/shared/stores/authStore';
 
 const TZ = 'Asia/Karachi';
+const formatTime12 = (iso: string) => formatInTimeZone(new Date(iso), TZ, 'h:mm a');
 
 const countdown = (target: number, now: number) => {
     const mins = Math.max(0, Math.floor((target - now) / 60000));

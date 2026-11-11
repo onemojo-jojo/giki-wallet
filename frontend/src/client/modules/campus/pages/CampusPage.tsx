@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Info, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getInitials } from '@/lib/initials';
+import { useAuthStore } from '@/shared/stores/authStore';
 import { ABOUT_LINK, CAMPUS_SERVICES, type CampusService } from '../services';
 
 const ServiceCard = ({ service }: { service: CampusService }) => {
@@ -48,6 +50,7 @@ const ServiceCard = ({ service }: { service: CampusService }) => {
 
 export const CampusPage = () => {
     const AboutIcon = ABOUT_LINK.icon;
+    const user = useAuthStore((s) => s.user);
 
     return (
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-5 pt-1">
@@ -56,16 +59,41 @@ export const CampusPage = () => {
                 <p className="text-sm text-muted-foreground">One balance for everything on campus.</p>
             </header>
 
+            {CAMPUS_SERVICES.some((s) => s.status === 'soon') && (
+                <div role="note" className="flex items-center gap-2.5 bg-iris-tint text-iris-strong rounded-[14px] px-3.5 py-2.5 text-[13px] font-bold">
+                    <Info className="size-[18px] shrink-0" aria-hidden="true" />
+                    {CAMPUS_SERVICES.filter((s) => s.status === 'soon')
+                        .map((s) => s.name)
+                        .join(' and ')}{' '}
+                    are coming soon to G-Bux.
+                </div>
+            )}
+
             <section aria-labelledby="campus-services" className="flex flex-col gap-2.5">
                 <h2 id="campus-services" className="font-display font-bold text-xl text-ink">
                     Pay on campus
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
                     {CAMPUS_SERVICES.map((service) => (
                         <ServiceCard key={service.key} service={service} />
                     ))}
                 </div>
             </section>
+
+            {/* Account / sign-in entry (mobile has no top bar, so keep it reachable from a tab). */}
+            <Link
+                to={user ? '/account' : '/auth/sign-in'}
+                className="flex items-center gap-3 bg-card rounded-[20px] px-4 py-3.5 hover:shadow-md transition-shadow focus-visible:outline-2 focus-visible:outline-iris"
+            >
+                <span className="size-10 rounded-xl bg-iris text-white flex items-center justify-center font-display font-bold text-sm">
+                    {user ? getInitials(user.name) : <UserRound className="size-5" aria-hidden="true" />}
+                </span>
+                <span className="flex-1 flex flex-col">
+                    <span className="text-[15px] font-bold text-ink">{user ? 'Your account' : 'Sign in'}</span>
+                    <span className="text-xs text-muted-foreground">{user ? 'Profile, security and sign out' : 'Or create an account with your GIKI email'}</span>
+                </span>
+                <ChevronRight className="size-5 text-light-gray" aria-hidden="true" />
+            </Link>
 
             <Link
                 to={ABOUT_LINK.to}

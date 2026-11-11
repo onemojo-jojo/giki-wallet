@@ -1,41 +1,52 @@
 import React from 'react';
-import { Phone, CheckCircle2, XCircle, Loader2, Smartphone, ShieldCheck, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Check, Clock, Lock, Smartphone, TriangleAlert } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { cn } from '@/lib/utils';
 import { JAZZCASH_PAYMENT_TIMEOUT_SECONDS, useJazzCashPayment } from '../hooks/useJazzCashPayment';
+import { useWalletModuleStore } from '../store';
+import { formatAmount } from '../utils/transactionHelpers';
+import { TopUpStepHeader } from './TopUpStepHeader';
 
 interface JazzCashPaymentProps {
     amount: number;
-    phoneNumber: string;
-    cnicLast6: string;
     onSuccess?: () => void;
     onFailure?: (error: string) => void;
     maxLimit?: number;
     currentBalance?: number;
+    /** Back to the payment-method step (only while nothing has been sent). */
+    onBack?: () => void;
+    /** Switch to card payment after a failure. */
+    onUseCard?: () => void;
 }
 
-const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({
-    amount,
-    phoneNumber,
-    cnicLast6,
-    onSuccess,
-    onFailure,
-    maxLimit,
-    currentBalance
-}) => {
-    // 1. Destructure the new props here
-    const {
-        status,
-        timeLeft,
-        errorMessage,
-        initiatePayment,
-        reset,
-        statusMessage, // New dynamic message
-        showTimer      // New boolean to toggle the countdown visibility
-    } = useJazzCashPayment(
-        amount,
-        phoneNumber,
-        cnicLast6
-    );
+// Backend accepts 03XXXXXXXXX or 3XXXXXXXXX (backend/internal/payment/utils.go).
+const MOBILE_RE = /^(03\d{9}|3\d{9})$/;
+const CNIC_RE = /^\d{6}$/;
+
+const RING_R = 96;
+const RING_C = 2 * Math.PI * RING_R;
+
+/** Gateway/API messages are shown as-is, but raw validation dumps (JSON) get a plain sentence instead. */
+const readableError = (msg: string | null) => {
+    const text = (msg ?? '').trim();
+    if (!text || text.startsWith('[') || text.startsWith('{')) return 'Something went wrong. Please try again.';
+    return text;
+};
+
+const formatClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`;
+
+/**
+ * JazzCash mobile-wallet top-up: account details → approve in the JazzCash app
+ * (countdown) → success / failure. Payment logic lives in useJazzCashPayment.
+ */
+const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, onFailure, maxLimit, currentBalance, onBack, onUseCard }) => {
+    const navigate = useNavigate();
+    const { formData, setMobileNumber, setCnicLastSix, balance } = useWalletModuleStore();
+    const phoneNumber = formData.mobile_number;
+    const cnicLast6 = formData.cnic_last_six;
+
+    const { status, timeLeft, errorMessage, initiatePayment, reset, statusMessage, showTimer } = useJazzCashPayment(amount, phoneNumber, cnicLast6);
 
     // Sync with parent callbacks
     React.useEffect(() => {
@@ -46,174 +57,258 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({
         if (status === 'failed' && onFailure) onFailure(errorMessage || 'Unknown error');
     }, [status, onSuccess, onFailure, errorMessage, amount]);
 
+    const mobileValid = MOBILE_RE.test(phoneNumber);
+    const cnicValid = CNIC_RE.test(cnicLast6);
+
+    const send = () => {
+        if (maxLimit && (currentBalance ?? 0) + amount > maxLimit) {
+            toast.error(`Top-up would exceed maximum allowed wallet balance of RS ${maxLimit}`);
+            return;
+        }
+        void initiatePayment();
+    };
+
+    // ---------------- Success ----------------
     if (status === 'success') {
         return (
-            <div className="bg-white p-8 rounded-3xl shadow-2xl border border-green-100 max-w-sm mx-auto text-center transform transition-all scale-100 animate-in fade-in zoom-in">
-                <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <CheckCircle2 className="w-12 h-12 text-green-500" />
+            <div className="flex flex-col gap-6 items-center text-center pt-10 animate-in fade-in zoom-in duration-300">
+                <span className="size-28 rounded-full bg-volt flex items-center justify-center">
+                    <span className="size-20 rounded-full bg-ink flex items-center justify-center">
+                        <Check className="size-10 text-volt" strokeWidth={3} aria-hidden="true" />
+                    </span>
+                </span>
+                <div className="flex flex-col gap-1.5" role="status">
+                    <span className="text-[15px] font-bold text-[#4A4766]">Payment successful — added to G-Bux</span>
+                    <span className="font-display text-[56px] font-extrabold tracking-tight leading-none text-ink tabular">Rs {formatAmount(amount)}</span>
+                    <span className="text-[15px] text-[#4A4766]">
+                        New balance <strong className="text-ink">Rs {formatAmount(balance)}</strong>
+                    </span>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h2>
-                <p className="text-gray-500 mb-6 font-medium">RS {amount.toLocaleString()} has been added to your wallet.</p>
-                <button
-                    onClick={() => window.location.href = '/'}
-                    className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-2xl transition-all"
-                >
-                    Back to Home
-                </button>
+                <div className="w-full flex flex-col gap-2.5 mt-4">
+                    <button
+                        type="button"
+                        onClick={() => (window.location.href = '/')}
+                        className="h-14 rounded-[18px] bg-ink text-white text-base font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                    >
+                        Back to Home
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/wallet')}
+                        className="h-11 rounded-xl text-iris-strong text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-iris"
+                    >
+                        View wallet
+                    </button>
+                </div>
             </div>
         );
     }
 
+    // ---------------- Failed / timed out ----------------
     if (status === 'failed') {
         return (
-            <div className="bg-white p-8 rounded-3xl shadow-2xl border border-red-100 max-w-sm mx-auto text-center animate-in fade-in slide-in-from-bottom-4">
-                <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <XCircle className="w-12 h-12 text-red-500" />
+            <div className="flex flex-col gap-5 pt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <span className="self-center size-28 rounded-[36px] bg-signal-tint flex items-center justify-center">
+                    <TriangleAlert className="size-14 text-[#B35F00]" aria-hidden="true" />
+                </span>
+                <div className="flex flex-col gap-2 text-center" role="alert">
+                    <h1 className="font-display text-[28px] font-extrabold tracking-tight text-ink">Payment didn't go through</h1>
+                    <p className="text-[15px] leading-relaxed text-[#4A4766]">{readableError(errorMessage)}</p>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Failed</h2>
-                <p className="text-gray-500 mb-6 font-medium px-4">{errorMessage || 'Something went wrong.'}</p>
-                <button
-                    onClick={reset}
-                    className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl transition-all"
-                >
-                    Try Again
-                </button>
+                <div className="bg-card rounded-[20px] p-4 flex flex-col gap-2">
+                    <h2 className="text-xs font-extrabold tracking-[0.06em] uppercase text-muted-foreground">Common fixes</h2>
+                    <ul className="list-disc pl-5 flex flex-col gap-1.5 text-sm text-[#4A4766]">
+                        <li>Keep the JazzCash app open and signed in.</li>
+                        <li>Check your JazzCash balance covers Rs {formatAmount(amount)}.</li>
+                        <li>Make sure the CNIC digits match the account holder.</li>
+                    </ul>
+                </div>
+                <p className="text-xs text-center text-muted-foreground">
+                    If money left your JazzCash account but isn't in G-Bux, contact support with the time of your payment.
+                </p>
+                <div className="flex flex-col gap-2.5">
+                    <button
+                        type="button"
+                        onClick={reset}
+                        className="h-14 rounded-[18px] bg-primary text-primary-foreground text-base font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                    >
+                        Try Again
+                    </button>
+                    {onUseCard && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                reset();
+                                onUseCard();
+                            }}
+                            className="h-12 rounded-2xl border-[1.5px] border-input bg-card text-ink text-[15px] font-extrabold focus-visible:outline-2 focus-visible:outline-iris"
+                        >
+                            Use a card instead
+                        </button>
+                    )}
+                </div>
             </div>
         );
     }
 
-    return (
-        <div className="bg-white p-8 rounded-[2rem] shadow-2xl border border-gray-100 max-w-sm mx-auto overflow-hidden relative">
-            <div className={`absolute top-0 left-0 w-full h-1 transition-all duration-1000 bg-primary ${status !== 'idle' ? 'opacity-100' : 'opacity-0'}`}
-                style={{ width: `${(timeLeft / JAZZCASH_PAYMENT_TIMEOUT_SECONDS) * 100}%` }} />
+    // ---------------- Waiting for approval ----------------
+    if (status === 'initiating' || status === 'processing') {
+        const progress = Math.max(0, Math.min(1, timeLeft / JAZZCASH_PAYMENT_TIMEOUT_SECONDS));
+        const urgent = status === 'processing' && showTimer;
+        const steps = [
+            { label: 'Request sent to JazzCash', state: status === 'processing' ? 'done' : 'now' },
+            { label: 'Enter your MPIN in the JazzCash app', state: status === 'processing' ? 'now' : 'next' },
+            { label: 'G-Bux updates here automatically', state: 'next' },
+        ] as const;
 
-            <div className="relative z-10">
-                <div className="flex justify-between items-start mb-8">
-                    <div>
-                        <h3 className="text-primary font-black tracking-tighter text-xl italic uppercase">JazzCash</h3>
-                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">M-Wallet Payment</p>
-                    </div>
-                    <div className="bg-primary/5 p-3 rounded-2xl">
-                        <Smartphone className={`w-6 h-6 text-primary ${(status === 'initiating' || status === 'processing') ? 'animate-bounce' : ''}`} />
+        return (
+            <div className="-mx-4 -mt-4 md:mx-0 md:mt-0 md:rounded-[28px] bg-ink text-white px-5 pt-5 pb-7 min-h-[calc(100vh-10rem)] md:min-h-0 flex flex-col gap-5">
+                <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-bold text-ink-muted">Step 3 of 3</span>
+                    <span className="font-display text-base font-extrabold tabular">Rs {formatAmount(amount)} → G-Bux</span>
+                </div>
+
+                <div
+                    role="timer"
+                    aria-label={status === 'processing' ? `${formatClock(timeLeft)} left to approve` : 'Sending request'}
+                    className="relative self-center size-[220px] mt-2"
+                >
+                    <svg width="220" height="220" viewBox="0 0 220 220" aria-hidden="true">
+                        <circle cx="110" cy="110" r={RING_R} fill="none" stroke="#2E2870" strokeWidth="12" />
+                        <circle
+                            cx="110"
+                            cy="110"
+                            r={RING_R}
+                            fill="none"
+                            stroke={urgent ? '#FF8A5B' : '#FFB648'}
+                            strokeWidth="12"
+                            strokeLinecap="round"
+                            strokeDasharray={RING_C}
+                            strokeDashoffset={RING_C * (1 - progress)}
+                            transform="rotate(-90 110 110)"
+                            className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+                        />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                        <span className="size-[52px] rounded-2xl bg-[#C8102E] flex items-center justify-center mb-1.5">
+                            <Smartphone className={cn('size-6', status === 'initiating' && 'animate-pulse')} aria-hidden="true" />
+                        </span>
+                        {urgent ? (
+                            <>
+                                <span className="font-mono text-[34px] font-semibold text-[#FFB648] tabular">{formatClock(timeLeft)}</span>
+                                <span className="text-xs font-bold text-[#FFB648]">Hurry up!</span>
+                            </>
+                        ) : status === 'processing' ? (
+                            <>
+                                <Clock className="size-7 text-[#FFB648] animate-pulse" aria-hidden="true" />
+                                <span className="text-xs text-ink-muted">Waiting for approval…</span>
+                            </>
+                        ) : (
+                            <span className="text-xs text-ink-muted">Sending request…</span>
+                        )}
                     </div>
                 </div>
 
-                {(status === 'initiating' || status === 'processing') ? (
-                    <div className="space-y-8 py-4 animate-in fade-in duration-700">
+                <div className="flex flex-col gap-2 text-center" aria-live="polite">
+                    <h1 className="font-display text-[28px] font-extrabold tracking-tight">
+                        {status === 'initiating' ? 'Sending payment request…' : 'Approve it in JazzCash'}
+                    </h1>
+                    <p className="text-[15px] leading-relaxed text-[#D9D6F2]">
+                        {status === 'initiating'
+                            ? "We're sending a payment request to your JazzCash app. Please keep your phone ready."
+                            : statusMessage}
+                    </p>
+                    <p className="text-sm text-ink-muted">
+                        Account <span className="font-mono text-white">{phoneNumber}</span>
+                    </p>
+                </div>
 
-                        {/* 2. Logic for the Big Central Icon/Timer */}
-                        <div className="text-center min-h-[140px] flex flex-col items-center justify-center">
-                            {status === 'processing' ? (
-                                <>
-                                    {showTimer ? (
-                                        // Urgent Phase (Last 60s): Show Countdown
-                                        <div className="relative inline-block animate-in zoom-in duration-300">
-                                            <div className="absolute inset-0 bg-red-500/10 rounded-full scale-150 animate-ping opacity-20" />
-                                            <h1 className="text-6xl font-black text-red-500 tabular-nums">
-                                                0:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
-                                            </h1>
-                                            <p className="text-red-400 text-sm font-bold uppercase tracking-tighter mt-4">Hurry Up!</p>
-                                        </div>
-                                    ) : (
-                                        // Buffer Phase (First 40s): Show waiting icon instead of timer
-                                        <div className="relative inline-block animate-in fade-in duration-500">
-                                            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center relative z-10 mx-auto">
-                                                <Clock className="w-12 h-12 text-primary animate-pulse" />
-                                            </div>
-                                            <p className="text-iris-strong text-sm font-bold uppercase tracking-tighter mt-4">Waiting for Approval...</p>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                // Initiating state
-                                <div className="flex justify-center py-2">
-                                    <div className="relative">
-                                        <div className="absolute inset-0 bg-yellow-500/20 rounded-full animate-ping" />
-                                        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center relative z-10">
-                                            <Smartphone className="w-8 h-8 text-yellow-600 animate-pulse" />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                <ol className="bg-ink-2 rounded-[20px] px-4 py-1.5 flex flex-col">
+                    {steps.map((s, i) => (
+                        <li key={s.label} className="flex items-center gap-3 py-3">
+                            <span
+                                className={cn(
+                                    'size-7 rounded-full flex items-center justify-center text-[13px] font-extrabold shrink-0',
+                                    s.state === 'done' && 'bg-volt text-ink',
+                                    s.state === 'now' && 'bg-[#FFB648] text-ink',
+                                    s.state === 'next' && 'bg-ink-3 text-ink-muted'
+                                )}
+                            >
+                                {s.state === 'done' ? <Check className="size-4" strokeWidth={3} aria-hidden="true" /> : i + 1}
+                            </span>
+                            <span className={cn('text-sm', s.state === 'now' ? 'text-white font-extrabold' : s.state === 'done' ? 'text-[#D9D6F2] font-semibold' : 'text-ink-muted font-semibold')}>
+                                {s.label}
+                            </span>
+                        </li>
+                    ))}
+                </ol>
 
-                        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 relative overflow-hidden">
-                            {/* Security Strip */}
-                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent animate-shimmer" />
-
-                            <div className="flex gap-4 items-center relative z-10">
-                                <div className={`w-10 h-10 rounded-xl shadow-sm flex items-center justify-center shrink-0 transition-colors duration-500 ${status === 'initiating' ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
-                                    {status === 'initiating' ? <ShieldCheck className="w-5 h-5" /> : <Phone className="w-5 h-5" />}
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-0.5">
-                                        {status === 'initiating' ? 'Requesting' : 'Action Required'}
-                                    </p>
-                                    <p className="text-sm font-bold text-gray-900">
-                                        {status === 'initiating' ? 'Sending Payment Request...' : 'Check Your Phone'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* 3. Logic for the Text Message */}
-                            <p className="text-[11px] text-gray-500 mt-4 leading-relaxed font-medium pl-14">
-                                {status === 'initiating'
-                                    ? "We're sending a payment request to your JazzCash app. Please keep your phone ready."
-                                    : statusMessage // Use the dynamic message from the hook
-                                }
-                            </p>
-                        </div>
-
-                        <div className="flex items-center justify-center gap-2 text-primary">
-                            {status === 'initiating' ? (
-                                <>
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] italic text-gray-400">Processing...</span>
-                                </>
-                            ) : (
-                                <div className="px-3 py-1 bg-primary/10 rounded-full flex items-center gap-2">
-                                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Live Transaction</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        <div className="bg-gray-50 p-6 rounded-2xl">
-                            <div className="flex justify-between items-center mb-4">
-                                <span className="text-sm text-gray-400 font-medium">Payable Amount</span>
-                                <span className="text-xl font-black text-gray-900 tracking-tight">RS {amount.toLocaleString()}</span>
-                            </div>
-                            <div className="h-[1px] bg-gray-200 mb-4" />
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-gray-400 font-medium">Account Number</span>
-                                <span className="text-sm font-bold text-gray-900">{phoneNumber}</span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={() => {
-                                if (maxLimit && (currentBalance ?? 0) + amount > maxLimit) {
-                                    toast.error(`Top-up would exceed maximum allowed wallet balance of RS ${maxLimit}`);
-                                    return;
-                                }
-                                initiatePayment();
-                            }}
-                            disabled={!amount || !phoneNumber}
-                            className="w-full bg-gray-900 hover:bg-black disabled:bg-gray-400 text-white font-bold py-5 rounded-2xl shadow-xl shadow-gray-200 transition-all flex items-center justify-center gap-3 overflow-hidden group"
-                        >
-                            <span className="relative z-10">Pay with JazzCash</span>
-                            <Smartphone className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                        </button>
-
-                        <div className="flex items-center justify-center gap-2 text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none">
-                            <ShieldCheck className="w-3 h-3" />
-                            Secured by State-of-the-Art Encryption
-                        </div>
-                    </div>
-                )}
+                <p className="mt-auto flex items-center justify-center gap-2 text-xs font-bold text-ink-muted">
+                    <span className="size-2 rounded-full bg-volt animate-pulse" aria-hidden="true" />
+                    Live transaction — keep this screen open
+                </p>
             </div>
+        );
+    }
+
+    // ---------------- Idle: account details ----------------
+    return (
+        <div className="flex flex-col gap-5">
+            <TopUpStepHeader title="JazzCash account" step={3} onBack={onBack} />
+
+            <div className="flex items-center justify-between bg-card rounded-2xl px-4 py-3.5">
+                <span className="text-sm text-[#4A4766]">Payable amount</span>
+                <span className="font-display text-[22px] font-extrabold text-ink tabular">Rs {formatAmount(amount)}</span>
+            </div>
+
+            <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-ink">
+                Mobile number
+                <input
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    value={phoneNumber}
+                    onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
+                    placeholder="03XX-XXXXXXX"
+                    maxLength={11}
+                    aria-invalid={phoneNumber.length === 11 && !mobileValid ? true : undefined}
+                    className="h-14 rounded-2xl border-[1.5px] border-input bg-card px-4 font-mono text-lg font-semibold tracking-[0.04em] text-ink outline-none focus:border-iris focus:border-2"
+                />
+                <span className="text-xs font-semibold text-muted-foreground">The JazzCash account that will approve the payment.</span>
+            </label>
+
+            <label className="flex flex-col gap-1.5 text-[13px] font-extrabold text-ink">
+                Last 6 digits of CNIC
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={cnicLast6}
+                    onChange={(e) => setCnicLastSix(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="XXXXXX"
+                    maxLength={6}
+                    className="h-14 rounded-2xl border-[1.5px] border-input bg-card px-4 font-mono text-xl font-semibold tracking-[0.5em] text-ink outline-none focus:border-iris focus:border-2"
+                />
+                <span className="text-xs font-semibold text-muted-foreground">Of the JazzCash account holder — JazzCash checks it.</span>
+            </label>
+
+            <button
+                type="button"
+                onClick={send}
+                disabled={!amount || !mobileValid || !cnicValid}
+                className="h-14 rounded-[18px] bg-primary text-primary-foreground text-base font-extrabold disabled:bg-secondary disabled:text-[#6E6B88] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+            >
+                {!mobileValid
+                    ? 'Enter your JazzCash mobile number'
+                    : !cnicValid
+                      ? `Enter ${6 - cnicLast6.length} more CNIC digit${6 - cnicLast6.length === 1 ? '' : 's'}`
+                      : 'Pay with JazzCash'}
+            </button>
+
+            <p className="flex items-center justify-center gap-1.5 text-xs text-[#4A4766]">
+                <Lock className="size-3.5 text-mint" aria-hidden="true" />
+                You'll approve the payment with your MPIN in the JazzCash app.
+            </p>
         </div>
     );
 };

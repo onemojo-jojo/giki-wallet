@@ -1,12 +1,11 @@
-
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle2, XCircle, Clock, ArrowRight, Home, RefreshCcw } from 'lucide-react';
-import { Button } from '@/shared/components/ui/button';
+import { Check, Clock, Home, TriangleAlert } from 'lucide-react';
 import { useWalletModuleStore } from '../store';
 import { getTransactionStatus } from '../api';
 import { PaymentStatus } from '../types';
 
+/** Landing page after the card checkout redirects back (/payment/success|failed|error|pending?txn=…). */
 const PaymentResultPage = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -57,75 +56,77 @@ const PaymentResultPage = () => {
     }, [txn, fetchBalance]);
 
     return (
-        <div className="max-w-md mx-auto pt-12 pb-20 px-4 min-h-[80vh] flex flex-col items-center justify-center">
-            <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl border border-gray-50 w-full text-center relative overflow-hidden group">
-                {/* Decorative background elements */}
-                <div className={`absolute -top-24 -right-24 w-48 h-48 rounded-full blur-3xl opacity-20 ${isSuccess ? 'bg-green-500' : isFailed ? 'bg-red-500' : 'bg-yellow-500'
-                    }`} />
-
-                {isSuccess && (
-                    <div className="relative z-10 animate-in fade-in zoom-in duration-700">
-                        <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8 relative">
-                            <div className="absolute inset-0 bg-green-100 rounded-full animate-ping opacity-25" />
-                            <CheckCircle2 className="w-14 h-14 text-green-500 relative z-10" />
-                        </div>
-                        <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Top-Up Successful!</h1>
-                        <p className="text-gray-500 mb-8 font-medium leading-relaxed">
+        <div className="max-w-md mx-auto w-full pt-8 flex flex-col items-center gap-6 text-center">
+            {isSuccess && (
+                <>
+                    <span className="size-28 rounded-full bg-volt flex items-center justify-center">
+                        <span className="size-20 rounded-full bg-ink flex items-center justify-center">
+                            <Check className="size-10 text-volt" strokeWidth={3} aria-hidden="true" />
+                        </span>
+                    </span>
+                    <div className="flex flex-col gap-2" role="status">
+                        <h1 className="font-display text-[30px] font-extrabold tracking-tight text-ink">Top-Up Successful!</h1>
+                        <p className="text-[15px] leading-relaxed text-[#4A4766]">
                             Your payment has been processed and your wallet balance has been updated.
                         </p>
-                        {txn && (
-                            <div className="bg-gray-50 px-4 py-3 rounded-2xl mb-8 border border-gray-100">
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Transaction Ref</p>
-                                <p className="text-sm font-mono font-bold text-gray-700">{txn}</p>
-                            </div>
-                        )}
                     </div>
-                )}
+                </>
+            )}
 
-                {isFailed && (
-                    <div className="relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                        <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-8">
-                            <XCircle className="w-14 h-14 text-red-500" />
-                        </div>
-                        <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Payment Failed</h1>
-                        <p className="text-gray-500 mb-8 font-medium leading-relaxed">
+            {isFailed && (
+                <>
+                    <span className="size-28 rounded-[36px] bg-coral-tint flex items-center justify-center">
+                        <TriangleAlert className="size-14 text-coral" aria-hidden="true" />
+                    </span>
+                    <div className="flex flex-col gap-2" role="alert">
+                        <h1 className="font-display text-[30px] font-extrabold tracking-tight text-ink">Payment Failed</h1>
+                        <p className="text-[15px] leading-relaxed text-[#4A4766]">
                             {gatewayMessage || "We couldn't process your payment. Please check your card details or try again with a different method."}
                         </p>
                     </div>
-                )}
+                </>
+            )}
 
-                {isPending && (
-                    <div className="relative z-10 animate-in fade-in zoom-in duration-700">
-                        <div className="w-24 h-24 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-8">
-                            <Clock className="w-14 h-14 text-yellow-500 animate-pulse" />
-                        </div>
-                        <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">Payment Pending</h1>
-                        <p className="text-gray-500 mb-8 font-medium leading-relaxed">
+            {isPending && (
+                <>
+                    <span className="size-28 rounded-[36px] bg-signal-tint flex items-center justify-center">
+                        <Clock className="size-14 text-[#B35F00] animate-pulse" aria-hidden="true" />
+                    </span>
+                    <div className="flex flex-col gap-2" role="status">
+                        <h1 className="font-display text-[30px] font-extrabold tracking-tight text-ink">Payment Pending</h1>
+                        <p className="text-[15px] leading-relaxed text-[#4A4766]">
                             {gatewayMessage || 'Your transaction is being verified by the gateway. This might take a few moments.'}
                         </p>
                     </div>
-                )}
+                </>
+            )}
 
-                <div className="space-y-4 relative z-10">
-                    <Button
-                        onClick={() => navigate('/')}
-                        className="w-full py-7 rounded-2xl font-bold text-lg shadow-xl shadow-primary/10 group/btn"
-                    >
-                        <Home className="w-5 h-5 mr-2 group-hover/btn:-translate-y-0.5 transition-transform" />
-                        Back to Home
-                    </Button>
-
-                    <Button
-                        variant="ghost"
-                        onClick={() => navigate('/top-up')}
-                        className="w-full py-4 rounded-xl font-bold text-gray-500 hover:text-gray-900"
-                    >
-                        {isFailed ? 'Try Again' : 'View Wallet'}
-                    </Button>
+            {txn && (
+                <div className="w-full bg-card rounded-2xl px-4 py-3 flex items-center justify-between gap-3">
+                    <span className="text-[13px] text-muted-foreground">Transaction ref</span>
+                    <span className="font-mono text-sm font-semibold text-ink break-all">{txn}</span>
                 </div>
+            )}
+
+            <div className="w-full flex flex-col gap-2.5">
+                <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="h-14 rounded-[18px] bg-ink text-white text-base font-extrabold flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                >
+                    <Home className="size-5" aria-hidden="true" />
+                    Back to Home
+                </button>
+                <button
+                    type="button"
+                    onClick={() => navigate(isFailed ? '/top-up' : '/wallet')}
+                    className="h-12 rounded-2xl border-[1.5px] border-input bg-card text-ink text-[15px] font-extrabold focus-visible:outline-2 focus-visible:outline-iris"
+                >
+                    {isFailed ? 'Try Again' : 'View Wallet'}
+                </button>
             </div>
 
-            <p className="mt-8 text-xs text-center text-gray-400 max-w-[280px] leading-relaxed">
+            <p className="text-xs text-muted-foreground max-w-[300px] leading-relaxed">
                 If the amount was deducted but doesn't show in your wallet, please contact support with your transaction reference.
             </p>
         </div>

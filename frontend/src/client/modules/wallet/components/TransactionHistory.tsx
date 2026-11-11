@@ -59,7 +59,7 @@ export const TransactionHistory = ({
                             {/* Date Header */}
                             <div className="sticky top-0 bg-white/80 backdrop-blur-md py-3 mb-4 z-10 border-b border-gray-100 flex items-center gap-3">
                                 <div className="w-1 h-4 bg-accent rounded-full" />
-                                <h3 className="text-xs font-black text-primary/60 uppercase tracking-[0.2em]">
+                                <h3 className="text-xs font-black text-iris-strong uppercase tracking-[0.2em]">
                                     {formatDate(date)}
                                 </h3>
                             </div>

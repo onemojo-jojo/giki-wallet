@@ -1,5 +1,6 @@
 export { Navbar } from './Navbar';
-export { ClientNavbar, AdminNavbar } from './navbar';
-export type { NavItem } from './navbar';
+// Explicit './navbar/index' — './navbar' collides with './Navbar' on case-insensitive filesystems (Windows/macOS).
+export { ClientNavbar, AdminNavbar } from './navbar/index';
+export type { NavItem } from './navbar/index';
 export { Footer } from './Footer';
 

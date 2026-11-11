@@ -1,4 +1,4 @@
-import { FooterCopyright } from './footer';
+import { FooterCopyright } from './footer/index';
 
 export const Footer = () => {
 

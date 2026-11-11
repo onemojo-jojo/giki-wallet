@@ -28,24 +28,23 @@ const TopUpPage = () => {
     const loadedLimit = useTopUpLimit();
     const maxLimit = loadedLimit ?? FALLBACK_MAX_LIMIT;
 
-    const { balance, fetchBalance, formData, setAmount, setMethod, resetFormData, status, resetPaymentState } = useWalletModuleStore();
+    const { balance, fetchBalance, formData, setAmount, setMethod, resetFormData, resetPaymentState } = useWalletModuleStore();
 
     useEffect(() => {
         void fetchBalance();
     }, [fetchBalance]);
 
-    // Fresh form on entry; clear a finished payment result from a previous visit
-    // (never interrupt one that's still waiting for approval).
+    // Fresh form and payment state on entry. A JazzCash request left "processing" by a
+    // previous visit can't be resumed here: its countdown and polling stopped when that
+    // screen unmounted. If the user approved it, the backend's reconciliation credits it.
     useEffect(() => {
         resetFormData();
         const current = useWalletModuleStore.getState().status;
-        if (current === 'success' || current === 'failed') resetPaymentState();
+        if (current === 'initiating' || current === 'processing') {
+            toast.info('Your previous JazzCash request was interrupted. If you approved it, it will show in your wallet shortly.');
+        }
+        if (current !== 'idle') resetPaymentState();
     }, [resetFormData, resetPaymentState]);
-
-    // If a JazzCash request is already in flight (e.g. user navigated back), show it.
-    useEffect(() => {
-        if (status === 'initiating' || status === 'processing') setStep('jazzcash');
-    }, [status]);
 
     // Scroll to top on page load (fixes mobile auto-scroll issue)
     useEffect(() => {
@@ -59,7 +58,8 @@ const TopUpPage = () => {
     }, []);
 
     const amount = Number.parseInt(formData.amount || '0', 10) || 0;
-    const room = Math.max(0, maxLimit - balance);
+    // Whole rupees only: the balance can carry paisa, and amounts here are integers.
+    const room = Math.max(0, Math.floor(maxLimit - balance));
     const exceeds = amount > 0 && balance + amount > maxLimit;
     const amountValid = amount >= 1 && !exceeds;
 
@@ -220,7 +220,10 @@ const TopUpPage = () => {
                         inputMode={isPhone ? 'none' : 'numeric'}
                         autoComplete="off"
                         value={formData.amount}
-                        onChange={(e) => setAmount(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, MAX_AMOUNT_DIGITS))}
+                        onChange={(e) =>
+                            // Keep whole rupees: drop anything after a decimal point instead of merging it in (500.50 → 500, not 50050).
+                            setAmount(e.target.value.split('.')[0].replace(/\D/g, '').replace(/^0+/, '').slice(0, MAX_AMOUNT_DIGITS))
+                        }
                         placeholder="0"
                         aria-describedby="topup-amount-help"
                         aria-invalid={exceeds || undefined}

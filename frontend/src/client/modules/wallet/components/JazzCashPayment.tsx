@@ -20,7 +20,8 @@ interface JazzCashPaymentProps {
     onUseCard?: () => void;
 }
 
-const MOBILE_RE = /^03\d{9}$/;
+// Backend accepts 03XXXXXXXXX or 3XXXXXXXXX (backend/internal/payment/utils.go).
+const MOBILE_RE = /^(03\d{9}|3\d{9})$/;
 const CNIC_RE = /^\d{6}$/;
 
 const RING_R = 96;
@@ -298,7 +299,7 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
                 className="h-14 rounded-[18px] bg-primary text-primary-foreground text-base font-extrabold disabled:bg-secondary disabled:text-[#6E6B88] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
             >
                 {!mobileValid
-                    ? 'Enter your 11-digit mobile number'
+                    ? 'Enter your JazzCash mobile number'
                     : !cnicValid
                       ? `Enter ${6 - cnicLast6.length} more CNIC digit${6 - cnicLast6.length === 1 ? '' : 's'}`
                       : 'Pay with JazzCash'}

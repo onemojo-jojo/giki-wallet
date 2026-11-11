@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Check, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Trip } from '../validators';
@@ -9,10 +10,13 @@ interface DepartureRowProps {
     isHeld: boolean;
     now: number;
     onBook: (trip: Trip) => void;
+    /** The fare was tapped: the stop picker (children) shows inside the row. */
+    expanded?: boolean;
+    children?: ReactNode;
 }
 
-/** One departure on the Rides board: time · city · seats/opening · fare button. */
-export const DepartureRow = ({ trip, isHeld, now, onBook }: DepartureRowProps) => {
+/** One departure on the Rides board: time · city · seats/opening · fare button (expands in place to book). */
+export const DepartureRow = ({ trip, isHeld, now, onBook, expanded, children }: DepartureRowProps) => {
     const status = trip.status.toUpperCase();
     const full = trip.available_seats <= 0 || status === 'FULL';
     const scheduled = status === 'SCHEDULED';
@@ -48,7 +52,8 @@ export const DepartureRow = ({ trip, isHeld, now, onBook }: DepartureRowProps) =
     }
 
     return (
-        <li className="bg-card rounded-[20px] px-4 py-3.5 flex items-center gap-3.5">
+        <li className={cn('bg-card rounded-[20px] px-4 py-3.5', expanded && 'ring-2 ring-iris')}>
+            <div className="flex items-center gap-3.5">
             <span className="flex flex-col w-[58px] shrink-0">
                 <span className={cn('font-display text-[22px] font-extrabold tracking-tight leading-none', open ? 'text-ink' : 'text-[#4A4766]')}>{time}</span>
                 <span className="text-[11px] font-extrabold text-muted-foreground">{ampm}</span>
@@ -66,8 +71,12 @@ export const DepartureRow = ({ trip, isHeld, now, onBook }: DepartureRowProps) =
                 <button
                     type="button"
                     onClick={() => onBook(trip)}
+                    aria-expanded={expanded ? true : false}
                     aria-label={`Book ${city}, ${time} ${ampm}, Rs ${formatRs(trip.base_price)}`}
-                    className="h-11 px-4 rounded-[14px] bg-ink text-white text-sm font-extrabold shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                    className={cn(
+                        'h-11 px-4 rounded-[14px] text-sm font-extrabold shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris',
+                        expanded ? 'bg-iris text-white' : 'bg-ink text-white'
+                    )}
                 >
                     Rs {formatRs(trip.base_price)}
                 </button>
@@ -84,6 +93,8 @@ export const DepartureRow = ({ trip, isHeld, now, onBook }: DepartureRowProps) =
                     {cancelled ? 'Cancelled' : closed ? 'Closed' : 'Full'}
                 </span>
             )}
+            </div>
+            {expanded && open && !isHeld && children}
         </li>
     );
 };

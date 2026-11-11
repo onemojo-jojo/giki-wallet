@@ -5,7 +5,9 @@ import { cn } from '@/lib/utils';
 import { LogoMark } from '@/shared/components/ui/Logo';
 import { useTransportStore } from '../store';
 import { formatRs } from '../bookingHelpers';
-import { PILL_CLASS, fmt, passengerLabel, splitTickets, ticketEnds, ticketPill } from '../ticketHelpers';
+import { PILL_CLASS, fmt, isCancelledStatus, isUpcoming, passengerLabel, splitTickets, ticketEnds, ticketPill } from '../ticketHelpers';
+import type { MyTicket } from '../validators';
+import { useWalletModuleStore } from '@/client/modules/wallet/store';
 import { QrCode } from '../components/QrCode';
 import { CancelRideSheet } from '../components/CancelRideSheet';
 
@@ -44,24 +46,38 @@ export const PassPage = () => {
     const location = useLocation();
     const { myTickets, fetchUserTickets, cancelTicket } = useTransportStore();
     const [loaded, setLoaded] = useState(false);
-    const [now] = useState(() => Date.now());
-    const [confirming, setConfirming] = useState(false);
+    const [now, setNow] = useState(() => Date.now());
+    // The ticket the cancel sheet is about — pinned when it opens so nothing can swap it mid-flow.
+    const [cancelTarget, setCancelTarget] = useState<MyTicket | null>(null);
     const [cancelling, setCancelling] = useState(false);
-    const touchX = useRef<number | null>(null);
+    const touch = useRef<{ x: number; y: number } | null>(null);
+    const cancelBtnRef = useRef<HTMLButtonElement>(null);
+    const fromList = !!(location.state as { fromList?: boolean } | null)?.fromList;
     useWakeLock();
 
     useEffect(() => {
         void fetchUserTickets().finally(() => setLoaded(true));
     }, [fetchUserTickets]);
 
+    useEffect(() => {
+        const t = window.setInterval(() => setNow(Date.now()), 60000);
+        return () => window.clearInterval(t);
+    }, []);
+
     const { upcoming } = useMemo(() => splitTickets(myTickets, now), [myTickets, now]);
-    const ticket = id ? myTickets.find((t) => t.ticket_id === id) : upcoming[0];
+    const current = id ? myTickets.find((t) => t.ticket_id === id) : upcoming[0];
+    // While the sheet is open, keep showing the ticket being cancelled.
+    const ticket = cancelTarget ?? current;
     const index = ticket ? upcoming.findIndex((t) => t.ticket_id === ticket.ticket_id) : -1;
 
     const close = () => (location.key !== 'default' ? navigate(-1) : navigate('/'));
     const goTo = (i: number) => {
         const t = upcoming[i];
-        if (t) navigate(`/tickets/${t.ticket_id}`, { replace: true });
+        if (t && !cancelTarget) navigate(`/tickets/${t.ticket_id}`, { replace: true, state: location.state });
+    };
+    const closeSheet = () => {
+        setCancelTarget(null);
+        window.setTimeout(() => cancelBtnRef.current?.focus(), 0);
     };
 
     if (!ticket) {
@@ -78,35 +94,43 @@ export const PassPage = () => {
 
     const ends = ticketEnds(ticket);
     const pill = ticketPill(ticket, now);
-    const isCancelled = ticket.status === 'CANCELLED';
-    const canCancel = !isCancelled && ticket.is_cancellable;
+    const isCancelled = isCancelledStatus(ticket.status);
+    // Only a live, upcoming ticket gets a scannable code.
+    const valid = isUpcoming(ticket, now);
+    const canCancel = valid && ticket.is_cancellable;
     const busLabel = `${(ticket.bus_type || 'Student').toUpperCase()} BUS`;
 
     const confirmCancel = async () => {
+        if (!cancelTarget || cancelling) return;
         setCancelling(true);
-        try {
-            // The store shows success / "too late" / error toasts itself.
-            await cancelTicket(ticket.ticket_id);
-        } finally {
-            setCancelling(false);
-            setConfirming(false);
-        }
-        const after = useTransportStore.getState().myTickets.find((t) => t.ticket_id === ticket.ticket_id);
-        if (after?.status === 'CANCELLED') {
-            void import('@/client/modules/wallet/store').then(({ useWalletModuleStore }) => useWalletModuleStore.getState().fetchBalance());
+        // The store shows success / "too late" / error toasts itself.
+        const ok = await cancelTicket(cancelTarget.ticket_id);
+        setCancelling(false);
+        if (ok) {
+            setCancelTarget(null);
+            void useWalletModuleStore.getState().fetchBalance();
             navigate('/tickets/all', { replace: true });
+        } else {
+            closeSheet();
         }
     };
 
     return (
+        <>
         <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pass-title"
+            inert={cancelTarget ? true : undefined}
             className="fixed inset-0 z-[60] bg-volt text-ink overflow-y-auto"
-            onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+            onTouchStart={(e) => (touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY })}
             onTouchEnd={(e) => {
-                if (touchX.current === null || index < 0) return;
-                const dx = e.changedTouches[0].clientX - touchX.current;
-                touchX.current = null;
-                if (Math.abs(dx) > 60) goTo(dx < 0 ? index + 1 : index - 1);
+                const start = touch.current;
+                touch.current = null;
+                if (!start || index < 0 || cancelTarget) return;
+                const dx = e.changedTouches[0].clientX - start.x;
+                const dy = e.changedTouches[0].clientY - start.y;
+                if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) goTo(dx < 0 ? index + 1 : index - 1);
             }}
         >
             <div className="max-w-[430px] min-h-full mx-auto px-5 pt-4 pb-6 flex flex-col gap-3.5">
@@ -119,8 +143,11 @@ export const PassPage = () => {
                     >
                         <X className="size-5" strokeWidth={2.4} />
                     </button>
-                    <h1 className="text-sm font-extrabold">{index >= 0 ? `Pass ${index + 1} of ${upcoming.length}` : 'Your pass'}</h1>
-                    <span className="text-xs font-extrabold bg-ink text-volt px-2.5 py-1.5 rounded-[10px]">Brightness max</span>
+                    <h1 id="pass-title" className="text-sm font-extrabold">{index >= 0 ? `Pass ${index + 1} of ${upcoming.length}` : 'Your pass'}</h1>
+                    {/* A reminder for the gate scanner, not a control. */}
+                    <span className="text-xs font-extrabold bg-ink text-volt px-2.5 py-1.5 rounded-[10px]" aria-label="Tip: turn your screen brightness up">
+                        Brightness max
+                    </span>
                 </header>
 
                 <article className={cn('bg-card rounded-[28px] overflow-hidden', isCancelled && 'opacity-70')} aria-label={`Pass for ${ends.route}`}>
@@ -146,10 +173,18 @@ export const PassPage = () => {
                     </div>
 
                     <div className="px-5 pt-[18px] pb-1.5 flex flex-col items-center gap-3">
-                        <div role="img" aria-label={`Boarding QR code for ticket ${ticket.ticket_code}`} className="p-2.5 rounded-2xl border-[1.5px] border-line text-ink">
-                            <QrCode value={ticket.ticket_code} size={176} />
-                        </div>
-                        <span className="font-mono text-xl font-semibold tracking-[0.1em]">{ticket.ticket_code}</span>
+                        {valid ? (
+                            <div role="img" aria-label={`Boarding QR code for ticket ${ticket.ticket_code}`} className="p-2.5 rounded-2xl border-[1.5px] border-line text-ink">
+                                <QrCode value={ticket.ticket_code} size={176} />
+                            </div>
+                        ) : (
+                            // Cancelled or departed: no scannable code.
+                            <div className="size-[198px] rounded-2xl border-[1.5px] border-dashed border-[#D9D7E5] bg-background flex flex-col items-center justify-center gap-1 text-center px-4">
+                                <span className="text-base font-extrabold text-ink">{isCancelled ? 'Ride cancelled' : 'Bus has left'}</span>
+                                <span className="text-xs text-muted-foreground">This pass can't be used to board.</span>
+                            </div>
+                        )}
+                        <span className={cn('font-mono text-xl font-semibold tracking-[0.1em]', !valid && 'line-through text-muted-foreground')}>{ticket.ticket_code}</span>
                     </div>
 
                     <div aria-hidden="true" className="relative h-6">
@@ -200,16 +235,28 @@ export const PassPage = () => {
                 )}
 
                 <div className={cn('mt-auto grid gap-2.5', canCancel ? 'grid-cols-2' : 'grid-cols-1')}>
-                    <Link
-                        to="/tickets/all"
-                        className="h-[50px] rounded-2xl bg-ink text-white text-[15px] font-extrabold flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                    >
-                        All tickets
-                    </Link>
+                    {fromList ? (
+                        // Came from the list: go back instead of stacking another list entry.
+                        <button
+                            type="button"
+                            onClick={() => navigate(-1)}
+                            className="h-[50px] rounded-2xl bg-ink text-white text-[15px] font-extrabold flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                        >
+                            All tickets
+                        </button>
+                    ) : (
+                        <Link
+                            to="/tickets/all"
+                            className="h-[50px] rounded-2xl bg-ink text-white text-[15px] font-extrabold flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                        >
+                            All tickets
+                        </Link>
+                    )}
                     {canCancel && (
                         <button
                             type="button"
-                            onClick={() => setConfirming(true)}
+                            ref={cancelBtnRef}
+                            onClick={() => setCancelTarget(ticket)}
                             className="h-[50px] rounded-2xl border-2 border-ink text-ink text-[15px] font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                         >
                             Cancel ride
@@ -217,17 +264,19 @@ export const PassPage = () => {
                     )}
                 </div>
             </div>
-
-            {confirming && (
-                <CancelRideSheet
-                    ticket={ticket}
-                    otherUpcoming={upcoming.filter((t) => t.ticket_id !== ticket.ticket_id).length}
-                    pending={cancelling}
-                    onConfirm={() => void confirmCancel()}
-                    onClose={() => setConfirming(false)}
-                />
-            )}
         </div>
+
+        {/* Outside the swipeable overlay so drags on the sheet can't change passes. */}
+        {cancelTarget && (
+            <CancelRideSheet
+                ticket={cancelTarget}
+                otherUpcoming={upcoming.filter((t) => t.ticket_id !== cancelTarget.ticket_id).length}
+                pending={cancelling}
+                onConfirm={() => void confirmCancel()}
+                onClose={closeSheet}
+            />
+        )}
+        </>
     );
 };
 

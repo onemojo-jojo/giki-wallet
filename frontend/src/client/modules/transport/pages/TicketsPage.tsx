@@ -15,14 +15,20 @@ export const TicketsPage = () => {
     const { activeHolds, releaseAllHolds, fetchUserTickets, myTickets, loading } = useTransportStore();
     const [tab, setTab] = useState<Tab>('upcoming');
     const [loaded, setLoaded] = useState(false);
-    const [now] = useState(() => Date.now());
+    const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
         void fetchUserTickets().finally(() => setLoaded(true));
     }, [fetchUserTickets]);
 
+    // Re-split every minute so a ride moves to Past while the page is open.
+    useEffect(() => {
+        const t = window.setInterval(() => setNow(Date.now()), 60000);
+        return () => window.clearInterval(t);
+    }, []);
+
     const { upcoming, past } = useMemo(() => splitTickets(myTickets, now), [myTickets, now]);
-    const pastGroups = useMemo(() => groupPast(past, now), [past, now]);
+    const pastGroups = useMemo(() => groupPast(past), [past]);
 
     // Back returns to wherever the user came from (the pass, Home…); a fresh visit goes to Rides.
     const goBack = () => (location.key !== 'default' ? navigate(-1) : navigate('/transport'));
@@ -72,7 +78,15 @@ export const TicketsPage = () => {
                         id={`tab-${t}`}
                         aria-selected={tab === t}
                         aria-controls={`panel-${t}`}
+                        tabIndex={tab === t ? 0 : -1}
                         onClick={() => setTab(t)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                                const next = t === 'upcoming' ? 'past' : 'upcoming';
+                                setTab(next);
+                                document.getElementById(`tab-${next}`)?.focus();
+                            }
+                        }}
                         className={cn(
                             'h-[42px] rounded-xl text-sm focus-visible:outline-2 focus-visible:outline-iris',
                             tab === t ? 'bg-card text-ink font-extrabold shadow-sm' : 'text-[#4A4766] font-semibold'
@@ -112,6 +126,7 @@ export const TicketsPage = () => {
                                 <Link
                                     key={t.ticket_id}
                                     to={`/tickets/${t.ticket_id}`}
+                                    state={{ fromList: true }}
                                     aria-label={`${ends.route}, ${fmt(t.departure_time, 'EEE d MMM, h:mm a')}. Open pass`}
                                     className="flex bg-card rounded-[22px] overflow-hidden text-ink hover:shadow-md transition-shadow focus-visible:outline-2 focus-visible:outline-iris"
                                 >
@@ -146,7 +161,7 @@ export const TicketsPage = () => {
             ) : (
                 <div role="tabpanel" id="panel-past" aria-labelledby="tab-past" className="flex flex-col gap-3">
                     {pastGroups.length === 0 ? (
-                        <p className="bg-card rounded-[22px] p-5 text-center text-sm font-semibold text-[#4A4766]">No past rides yet.</p>
+                        <p className="bg-card rounded-[22px] p-5 text-center text-sm font-semibold text-[#4A4766]">No cancelled or recently departed rides.</p>
                     ) : (
                         pastGroups.map((g) => (
                             <section key={g.key} aria-labelledby={`past-${g.key}`} className="flex flex-col gap-2.5">

@@ -6,6 +6,7 @@ import { useTransportStore } from '@/client/modules/transport/store';
 import { getWeeklySummary } from '@/client/modules/transport/api';
 import type { MyTicket, Trip } from '@/client/modules/transport/validators';
 import { useAuthStore } from '@/shared/stores/authStore';
+import { isUpcoming } from '@/client/modules/transport/ticketHelpers';
 
 const TZ = 'Asia/Karachi';
 const formatTime12 = (iso: string) => formatInTimeZone(new Date(iso), TZ, 'h:mm a');
@@ -54,9 +55,8 @@ export const UpcomingRides = () => {
 
     // Same rule as the Tickets page: hide cancelled and anything that left more than 3h ago.
     const upcoming = useMemo(() => {
-        const cutoff = now - 3 * 60 * 60 * 1000;
         return myTickets
-            .filter((t: MyTicket) => t.status !== 'CANCELLED' && new Date(t.departure_time).getTime() >= cutoff)
+            .filter((t: MyTicket) => isUpcoming(t, now))
             .sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
             .slice(0, 2);
     }, [myTickets, now]);

@@ -22,6 +22,7 @@ export const CancelRideSheet = ({ ticket, otherUpcoming, pending, onConfirm, onC
     const [balanceReady, setBalanceReady] = useState(false);
     const isEmployee = useAuthStore((s) => s.user?.user_type?.toUpperCase() === 'EMPLOYEE');
     const keepRef = useRef<HTMLButtonElement>(null);
+    const sheetRef = useRef<HTMLElement>(null);
     const ends = ticketEnds(ticket);
     const refund = ticket.price;
 
@@ -33,6 +34,23 @@ export const CancelRideSheet = ({ ticket, otherUpcoming, pending, onConfirm, onC
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && !pending) onClose();
+            // Keep Tab inside the sheet.
+            if (e.key === 'Tab' && sheetRef.current) {
+                const items = [...sheetRef.current.querySelectorAll<HTMLElement>('button:not([disabled])')];
+                if (items.length === 0) return;
+                const first = items[0];
+                const last = items[items.length - 1];
+                if (!sheetRef.current.contains(document.activeElement)) {
+                    e.preventDefault();
+                    first.focus();
+                } else if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -42,6 +60,7 @@ export const CancelRideSheet = ({ ticket, otherUpcoming, pending, onConfirm, onC
         <div className="fixed inset-0 z-[70] flex items-end justify-center">
             <div aria-hidden="true" className="absolute inset-0 bg-ink/60" onClick={() => !pending && onClose()} />
             <section
+                ref={sheetRef}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="cancel-title"

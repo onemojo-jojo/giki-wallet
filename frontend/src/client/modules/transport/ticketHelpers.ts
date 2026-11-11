@@ -7,8 +7,11 @@ const UPCOMING_GRACE_MS = 3 * 60 * 60 * 1000;
 
 const byDeparture = (a: MyTicket, b: MyTicket) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime();
 
+/** CANCELLED (by the rider) and CANCELLED_BY_ADMIN (trip cancelled) both count. */
+export const isCancelledStatus = (status: string) => status.toUpperCase().startsWith('CANCELLED');
+
 export const isUpcoming = (t: MyTicket, now = Date.now()) =>
-    t.status !== 'CANCELLED' && new Date(t.departure_time).getTime() >= now - UPCOMING_GRACE_MS;
+    !isCancelledStatus(t.status) && new Date(t.departure_time).getTime() >= now - UPCOMING_GRACE_MS;
 
 /** Upcoming soonest-first; past (departed or cancelled) newest-first. */
 export const splitTickets = (tickets: MyTicket[], now = Date.now()) => {
@@ -46,8 +49,8 @@ export const passengerLabel = (t: MyTicket) =>
 export type Pill = { label: string; tone: 'paid' | 'done' | 'refunded' | 'cancelled' };
 
 export const ticketPill = (t: MyTicket, now = Date.now()): Pill => {
-    if (t.status === 'CANCELLED') return t.price > 0 ? { label: `Refunded Rs ${formatRs(t.price)}`, tone: 'refunded' } : { label: 'Cancelled', tone: 'cancelled' };
-    if (!isUpcoming(t, now)) return { label: 'Ridden', tone: 'done' };
+    if (isCancelledStatus(t.status)) return t.price > 0 ? { label: `Refunded Rs ${formatRs(t.price)}`, tone: 'refunded' } : { label: 'Cancelled', tone: 'cancelled' };
+    if (!isUpcoming(t, now)) return { label: 'Departed', tone: 'done' };
     return { label: t.price > 0 ? 'Paid' : 'Booked', tone: 'paid' };
 };
 
@@ -58,18 +61,14 @@ export const PILL_CLASS: Record<Pill['tone'], string> = {
     cancelled: 'text-[#8F1B21] bg-coral-tint',
 };
 
-/** Past tickets grouped under month headings ("EARLIER THIS MONTH", "OCTOBER 2026", …). */
-export const groupPast = (past: MyTicket[], now = Date.now()) => {
-    const thisMonth = formatInTimeZone(new Date(now), TZ, 'yyyy-MM');
-    const groups: { key: string; label: string; tickets: MyTicket[] }[] = [];
-    for (const t of past) {
-        const key = fmt(t.departure_time, 'yyyy-MM');
-        let g = groups.find((x) => x.key === key);
-        if (!g) {
-            g = { key, label: key === thisMonth ? 'EARLIER THIS MONTH' : fmt(t.departure_time, 'MMMM yyyy').toUpperCase(), tickets: [] };
-            groups.push(g);
-        }
-        g.tickets.push(t);
-    }
-    return groups;
+/**
+ * Past tab groups. The server only returns rides up to 3 h after departure, so this is mostly
+ * cancelled rides (rider or trip cancelled) plus rides that just left.
+ */
+export const groupPast = (past: MyTicket[]) => {
+    const groups = [
+        { key: 'recent', label: 'JUST DEPARTED', tickets: past.filter((t) => !isCancelledStatus(t.status)) },
+        { key: 'cancelled', label: 'CANCELLED', tickets: past.filter((t) => isCancelledStatus(t.status)) },
+    ];
+    return groups.filter((g) => g.tickets.length > 0);
 };

@@ -5,10 +5,10 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 import { useWalletModuleStore } from '../store';
 import { useTopUpLimit } from '../hooks/useTopUpLimit';
-import { Transaction, TransactionFilter, matchesFilter, toTransaction } from '../utils/transactionHelpers';
+import { Transaction, TransactionFilter, formatAmount, matchesFilter, toTransaction } from '../utils/transactionHelpers';
 import { TransactionList } from '../components/TransactionList';
 import { TransactionReceipt } from '../components/TransactionReceipt';
-import { formatAmount } from '../components/TransactionRow';
+
 
 const TZ = 'Asia/Karachi';
 
@@ -22,7 +22,9 @@ const FILTERS: { key: TransactionFilter; label: string }[] = [
 
 /** The Wallet tab: balance, this month's in/out, and the full filterable history. */
 export const WalletTabPage = () => {
-    const { balance, transactions, isDataLoading, fetchBalance, fetchHistory } = useWalletModuleStore();
+    const { balance, transactions, isDataLoading, isHistoryLoading, historyError, fetchBalance, fetchHistory } = useWalletModuleStore();
+    // Show the skeleton (not "No transactions yet") until the first history request has finished.
+    const [historyLoaded, setHistoryLoaded] = useState(false);
     const maxLimit = useTopUpLimit();
     const [showBalance, setShowBalance] = useState(true);
     const [filter, setFilter] = useState<TransactionFilter>('all');
@@ -30,7 +32,7 @@ export const WalletTabPage = () => {
 
     useEffect(() => {
         void fetchBalance();
-        void fetchHistory();
+        void fetchHistory().finally(() => setHistoryLoaded(true));
     }, [fetchBalance, fetchHistory]);
 
     const mapped = useMemo(() => transactions.map(toTransaction), [transactions]);
@@ -72,7 +74,7 @@ export const WalletTabPage = () => {
                 <div className="flex items-end justify-between gap-3">
                     <div className="flex flex-col gap-1">
                         <span className="text-[13px] font-bold text-muted-foreground">G-Bux balance</span>
-                        <span className={cn('font-display font-extrabold text-[40px] leading-none tracking-tight tabular text-ink', isDataLoading && 'opacity-70')} aria-live="polite">
+                        <span className={cn('font-display font-extrabold text-[40px] leading-none tracking-tight tabular text-ink', isDataLoading && 'opacity-70')} aria-live={showBalance ? 'polite' : 'off'}>
                             {showBalance ? `Rs ${formatAmount(balance)}` : 'Rs ••••'}
                         </span>
                     </div>
@@ -114,7 +116,7 @@ export const WalletTabPage = () => {
                         aria-label="Refresh balance and history"
                         className="size-11 rounded-[14px] bg-secondary text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
                     >
-                        <RotateCcw className={cn('size-5', isDataLoading && 'animate-spin')} />
+                        <RotateCcw className={cn('size-5', (isDataLoading || isHistoryLoading) && 'animate-spin')} />
                     </button>
                 </div>
 
@@ -149,7 +151,18 @@ export const WalletTabPage = () => {
                 ))}
             </div>
 
-            {isDataLoading && transactions.length === 0 ? (
+            {historyError && transactions.length === 0 ? (
+                <div role="alert" className="bg-coral-tint rounded-[20px] p-4 flex items-center gap-3">
+                    <span className="flex-1 text-sm font-bold text-[#8F1B21]">Couldn't load your transactions.</span>
+                    <button
+                        type="button"
+                        onClick={() => void fetchHistory()}
+                        className="h-10 px-4 rounded-xl bg-card text-[#8F1B21] text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-coral"
+                    >
+                        Retry
+                    </button>
+                </div>
+            ) : (isHistoryLoading || !historyLoaded) && transactions.length === 0 ? (
                 <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading transactions">
                     {[0, 1, 2].map((i) => (
                         <div key={i} className="bg-card rounded-[20px] p-3.5 flex items-center gap-3">

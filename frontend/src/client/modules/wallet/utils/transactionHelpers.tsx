@@ -20,6 +20,9 @@ export interface Transaction {
 
 const TIMEZONE = 'Asia/Karachi';
 
+/** Absolute amount for display, e.g. 1,250 or 99.5. */
+export const formatAmount = (n: number) => Math.abs(n).toLocaleString('en-PK', { maximumFractionDigits: 2 });
+
 /** Map an API transaction to the UI model. Groups by the Karachi calendar day, not the UTC day. */
 export const toTransaction = (t: ApiTransaction): Transaction => ({
     id: t.id,

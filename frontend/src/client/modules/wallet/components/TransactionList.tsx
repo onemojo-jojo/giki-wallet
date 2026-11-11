@@ -18,7 +18,15 @@ export const TransactionList = ({ transactions, onSelect, variant = 'cards' }: T
         <div className="flex flex-col gap-4">
             {groups.map(({ date, transactions: rows }) => (
                 <section key={date} className="flex flex-col gap-2" aria-label={formatDate(date)}>
-                    <h3 className="px-1 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground">{formatDate(date)}</h3>
+                    <h3
+                        className={
+                            variant === 'plain'
+                                ? 'sticky top-0 z-10 bg-white/90 backdrop-blur-md py-2 px-1 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground'
+                                : 'px-1 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground'
+                        }
+                    >
+                        {formatDate(date)}
+                    </h3>
                     <div className={variant === 'cards' ? 'bg-card rounded-[20px] px-3.5' : ''}>
                         {rows.map((t, i) => (
                             <TransactionRow key={t.id} transaction={t} onSelect={onSelect} divider={i > 0} />

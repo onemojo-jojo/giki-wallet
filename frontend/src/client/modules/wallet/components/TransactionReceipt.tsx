@@ -3,8 +3,7 @@ import { Check, Copy } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Modal } from '@/shared/components/ui/Modal';
 import { cn } from '@/lib/utils';
-import { Transaction, getIconBackground, getTransactionIcon, getTransactionTitle } from '../utils/transactionHelpers';
-import { formatAmount } from './TransactionRow';
+import { Transaction, formatAmount, getIconBackground, getTransactionIcon, getTransactionTitle } from '../utils/transactionHelpers';
 
 interface TransactionReceiptProps {
     transaction: Transaction | null;
@@ -65,6 +64,9 @@ export const TransactionReceipt = ({ transaction, onClose }: TransactionReceiptP
                                     >
                                         {copied ? <Check className="size-4 text-mint" /> : <Copy className="size-4" />}
                                     </button>
+                                    <span role="status" className="sr-only">
+                                        {copied ? 'Reference copied' : ''}
+                                    </span>
                                 </dd>
                             </div>
                         )}

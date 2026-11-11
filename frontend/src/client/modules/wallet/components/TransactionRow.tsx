@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils';
-import { Transaction, getIconBackground, getTransactionIcon, getTransactionTitle } from '../utils/transactionHelpers';
+import { Transaction, formatAmount, getIconBackground, getTransactionIcon, getTransactionTitle } from '../utils/transactionHelpers';
 
-export const formatAmount = (n: number) => Math.abs(n).toLocaleString('en-PK', { maximumFractionDigits: 2 });
 
 interface TransactionRowProps {
     transaction: Transaction;
@@ -23,7 +22,9 @@ export const TransactionRow = ({ transaction, onSelect, divider }: TransactionRo
                 'focus-visible:outline-2 focus-visible:outline-iris',
                 divider && 'border-t border-[#F0EFF5]'
             )}
-            aria-label={`${title}, ${isDebit ? 'minus' : 'plus'} Rs ${formatAmount(transaction.amount)}, ${transaction.timestamp}. Open receipt`}
+            aria-label={`${title}, ${isDebit ? 'minus' : 'plus'} Rs ${formatAmount(transaction.amount)}, ${transaction.timestamp}${
+                transaction.referenceId ? `, reference ${transaction.referenceId}` : ''
+            }. Open receipt`}
         >
             <span className={cn('size-[42px] rounded-[14px] flex items-center justify-center shrink-0', getIconBackground(transaction.type))}>
                 {getTransactionIcon(transaction.type)}

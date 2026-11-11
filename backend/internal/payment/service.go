@@ -399,7 +399,7 @@ func (s *Service) initiateMWalletPayment(
 		AmountPaisa:       AmountToPaisa(gatewayTxn.Amount),
 		BillRefID:         billRefNo,
 		TxnRefNo:          txnRefNo,
-		Description:       "GIKI Wallet Top Up",
+		Description:       "Talaria Top Up",
 		MobileNumber:      phoneNumber,
 		CNICLast6:         cnic,
 		TxnDateTime:       txnDateTime,
@@ -796,7 +796,7 @@ func (s *Service) buildAutoSubmitForm(fields gateway.JazzCashFields, jazzcashPos
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-			<title>Secure Payment Redirect | GIKI Wallet</title>
+			<title>Secure Payment Redirect | Talaria</title>
 			<script src="https://cdn.tailwindcss.com"></script>
 			<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 			<style>

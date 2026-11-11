@@ -210,7 +210,7 @@ func (w *JobWorker) handleStudentVerification(payload json.RawMessage) error {
 		return err
 	}
 
-	return w.mailer.SendTemplate(data.Email, "Verify your GIKI Account", "verify.html", data)
+	return w.mailer.SendTemplate(data.Email, "Verify your Talaria account", "verify.html", data)
 }
 
 func (w *JobWorker) handleEmployeeWait(payload json.RawMessage) error {
@@ -265,7 +265,7 @@ func (w *JobWorker) handleAccountCreated(payload json.RawMessage) error {
 		return err
 	}
 
-	return w.mailer.SendTemplate(data.Email, "Welcome to GIKI Transport", "account_created.html", data)
+	return w.mailer.SendTemplate(data.Email, "Welcome to Talaria", "account_created.html", data)
 }
 
 func (w *JobWorker) handlePasswordReset(payload json.RawMessage) error {
@@ -274,7 +274,7 @@ func (w *JobWorker) handlePasswordReset(payload json.RawMessage) error {
 		return err
 	}
 
-	return w.mailer.SendTemplate(data.Email, "Reset Your GIKI Password", "reset_password.html", data)
+	return w.mailer.SendTemplate(data.Email, "Reset your Talaria password", "reset_password.html", data)
 }
 func (w *JobWorker) GetStatus(ctx context.Context) (map[string]interface{}, error) {
 	stats, err := w.q.GetJobStats(ctx)

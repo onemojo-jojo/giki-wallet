@@ -88,8 +88,8 @@ export const RouteGrid = ({ direction, onBook }: RouteGridProps) => {
 
     if (routeGroups.length === 0) {
         return (
-            <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                <p className="text-gray-500 font-medium">
+            <div className="text-center py-10 px-4 bg-card rounded-[22px]">
+                <p className="text-[15px] font-bold text-[#4A4766]">
                     No {direction === 'OUTBOUND' ? 'outbound' : 'return'} trips available this week
                 </p>
             </div>
@@ -97,7 +97,7 @@ export const RouteGrid = ({ direction, onBook }: RouteGridProps) => {
     }
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
             {routeGroups.map(({ routeName, routeId, trips }) => (
                 <RouteCard
                     key={routeId}

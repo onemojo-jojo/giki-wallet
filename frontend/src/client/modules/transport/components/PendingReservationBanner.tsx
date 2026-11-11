@@ -1,41 +1,41 @@
-import { Button } from '@/shared/components/ui/button';
-import { Clock } from 'lucide-react';
-
 interface PendingReservationBannerProps {
     count: number;
     timeLeft: number;
     onReleaseAll: () => void;
 }
 
+/** Amber hold banner: seats are reserved for a limited time. */
 export function PendingReservationBanner({ count, timeLeft, onReleaseAll }: PendingReservationBannerProps) {
+    if (count <= 0) return null;
+
     const formatTime = (seconds: number) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
-
     return (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between animate-in slide-in-from-top duration-500 ring-1 ring-amber-100/50">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shadow-sm border border-amber-200/50">
-                    <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                    <p className="text-sm font-black text-amber-900 uppercase tracking-tight">Pending Reservation</p>
-                    <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest flex items-center gap-2">
-                        {count} seats held <span className="w-1 h-1 rounded-full bg-amber-300" /> Expires in <span className="font-black text-amber-900 bg-amber-200/50 px-1.5 py-0.5 rounded-md tabular-nums">{formatTime(timeLeft)}</span>
-                    </p>
-                </div>
-            </div>
-            <Button
-                variant="ghost"
-                size="sm"
+        <div
+            role="timer"
+            aria-label={`${count} seat${count === 1 ? '' : 's'} held, ${formatTime(timeLeft)} left`}
+            className="bg-signal-tint rounded-[20px] p-3.5 flex items-center gap-3 animate-in slide-in-from-top duration-300"
+        >
+            <span className="font-mono font-semibold text-base text-signal-text bg-card px-2.5 py-1.5 rounded-xl tabular shrink-0">
+                {formatTime(timeLeft)}
+            </span>
+            <span className="flex-1 min-w-0 flex flex-col">
+                <span className="text-sm font-extrabold text-[#4A2800]">
+                    {count} seat{count === 1 ? '' : 's'} held for you
+                </span>
+                <span className="text-xs font-semibold text-[#6B3A00]">Confirm before the timer ends or they go back to the pool.</span>
+            </span>
+            <button
+                type="button"
                 onClick={onReleaseAll}
-                className="text-amber-700 hover:bg-amber-200/50 hover:text-amber-900 font-black text-[10px] uppercase tracking-[0.15em] px-4 h-9 rounded-xl border border-amber-200 transition-all duration-300 active:scale-95"
+                className="h-10 px-3 rounded-xl bg-card text-signal-text text-xs font-extrabold shrink-0 focus-visible:outline-2 focus-visible:outline-iris"
             >
                 Release All
-            </Button>
+            </button>
         </div>
     );
 }

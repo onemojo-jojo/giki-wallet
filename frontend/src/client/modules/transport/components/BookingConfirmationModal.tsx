@@ -1,16 +1,5 @@
-import { Button } from '@/shared/components/ui/button';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
-
-export interface TripSummary {
-    route: string | null;
-    when: string;
-    pickup: string;
-    dropoff: string;
-    seats: number;
-    priceEach: number;
-}
-
 import { Passenger } from '../validators';
 
 export interface TripSummary {
@@ -41,6 +30,24 @@ export interface BookingConfirmationModalProps {
     isStudent?: boolean;
 }
 
+const formatRs = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 });
+
+const LegSummary = ({ label, s }: { label: string; s: TripSummary }) => (
+    <div className="p-4 rounded-2xl bg-background flex flex-col gap-1.5">
+        <span className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-iris-strong">{label}</span>
+            <span className="text-xs font-bold text-muted-foreground">
+                {s.seats} seat{s.seats === 1 ? '' : 's'}
+            </span>
+        </span>
+        <span className="font-display text-lg font-extrabold text-ink leading-tight">{s.route}</span>
+        <span className="text-[13px] text-[#4A4766]">{s.when}</span>
+        <span className="text-[13px] font-bold text-ink">
+            {s.pickup} → {s.dropoff}
+        </span>
+    </div>
+);
+
 export function BookingConfirmationModal({
     isOpen,
     onClose,
@@ -55,6 +62,9 @@ export function BookingConfirmationModal({
     isStudent = false,
 }: BookingConfirmationModalProps) {
     const allHolds = [...outboundHolds, ...returnHolds];
+    const total =
+        (outboundSummary ? outboundSummary.seats * outboundSummary.priceEach : 0) +
+        (returnSummary ? returnSummary.seats * returnSummary.priceEach : 0);
 
     return (
         <Modal
@@ -63,109 +73,67 @@ export function BookingConfirmationModal({
             title="Confirm booking"
             footer={
                 <div className="flex gap-3">
-                    <Button
-                        variant="outline"
-                        className="flex-1 h-14 rounded-2xl border-slate-200 font-bold text-xs text-slate-500 uppercase tracking-widest hover:bg-slate-50"
+                    <button
+                        type="button"
+                        className="flex-1 h-14 rounded-[18px] border-[1.5px] border-input bg-card text-ink text-[15px] font-extrabold disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-iris"
                         disabled={confirming}
                         onClick={onClose}
                     >
                         Cancel
-                    </Button>
-                    <Button
-                        className="flex-1 h-14 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"
+                    </button>
+                    <button
+                        type="button"
+                        className="flex-[1.4] h-14 rounded-[18px] bg-ink text-white text-[15px] font-extrabold flex items-center justify-between px-5 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
                         disabled={confirming}
                         onClick={onConfirm}
                     >
-                        {confirming ? 'Confirming…' : 'Confirm'}
-                    </Button>
+                        <span>{confirming ? 'Confirming…' : 'Confirm'}</span>
+                        {total > 0 && <span className="font-display text-volt tabular">Rs {formatRs(total)}</span>}
+                    </button>
                 </div>
             }
         >
-            <div className="space-y-6">
-                {outboundSummary && (
-                    <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/50 shadow-sm">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Outbound Trip</p>
-                        <h4 className="text-sm font-bold text-slate-900 tracking-tight">{outboundSummary.route}</h4>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-                            <p className="text-xs text-slate-500 font-medium">
-                                {outboundSummary.when}
-                            </p>
-                            <div className="w-1 h-1 rounded-full bg-slate-300" />
-                            <p className="text-xs text-slate-500 font-bold">
-                                {outboundSummary.seats} Seat(s)
-                            </p>
-                        </div>
-                        <p className="text-[10px] font-black text-iris-strong uppercase tracking-widest mt-3 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                            {outboundSummary.pickup} → {outboundSummary.dropoff}
-                        </p>
-                    </div>
-                )}
+            <div className="flex flex-col gap-4">
+                {outboundSummary && <LegSummary label="Outbound trip" s={outboundSummary} />}
+                {returnSummary && <LegSummary label="Return trip" s={returnSummary} />}
 
-                {returnSummary && (
-                    <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/50 shadow-sm">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Return Trip</p>
-                        <h4 className="text-sm font-bold text-slate-900 tracking-tight">{returnSummary.route}</h4>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
-                            <p className="text-xs text-slate-500 font-medium">
-                                {returnSummary.when}
-                            </p>
-                            <div className="w-1 h-1 rounded-full bg-slate-300" />
-                            <p className="text-xs text-slate-500 font-bold">
-                                {returnSummary.seats} Seat(s)
-                            </p>
-                        </div>
-                        <p className="text-[10px] font-black text-iris-strong uppercase tracking-widest mt-3 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-                            {returnSummary.pickup} → {returnSummary.dropoff}
-                        </p>
-                    </div>
-                )}
-
-                <div className="pt-2">
-                    <div className="flex items-center gap-2.5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">
-                        Passenger Details
-                    </div>
-                    <div className="space-y-4">
-                        {allHolds.map((h, idx) => {
-                            const p = passengers[h.hold_id] || { name: '', relation: 'SELF' as const };
-                            return (
-                                <div key={h.hold_id} className="p-5 rounded-2xl border border-slate-100 bg-white shadow-sm ring-1 ring-slate-200/5">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Seat #{idx + 1}</p>
-                                    <div className="space-y-3">
-                                        <input
-                                            className="w-full h-12 border border-slate-100 rounded-xl px-4 text-sm font-bold text-slate-900 placeholder:text-slate-300 focus:ring-2 focus:ring-primary/10 focus:border-primary transition-all bg-slate-50/50 shadow-inner"
-                                            placeholder="Enter passenger name"
-                                            value={p.name}
-                                            onChange={(e) => onUpdatePassenger(h.hold_id, { ...p, name: e.target.value })}
-                                            disabled={isStudent} // Students usually just use their name which is prefilled
-                                        />
-                                        {!isStudent && (
-                                            <Select
-                                                options={[
-                                                    { value: 'SELF', label: 'Myself' },
-                                                    { value: 'SPOUSE', label: 'Spouse' },
-                                                    { value: 'CHILD', label: 'Child' },
-                                                    { value: 'PARENT', label: 'Parent' },
-                                                    { value: 'GUEST', label: 'Guest' },
-                                                ]}
-                                                value={p.relation}
-                                                onChange={(v) => onUpdatePassenger(h.hold_id, { ...p, relation: v as Passenger['relation'] })}
-                                                placeholder="Select relation"
-                                                className="h-12 rounded-xl bg-slate-50/50 border-slate-100 font-bold text-sm shadow-inner"
-                                                showLabel={false}
-                                            />
-                                        )}
-                                        {isStudent && (
-                                            <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                                Relation: Self
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                <div className="flex flex-col gap-3">
+                    <h3 className="text-xs font-extrabold text-muted-foreground uppercase tracking-[0.06em]">Passenger details</h3>
+                    {allHolds.map((h, idx) => {
+                        const p = passengers[h.hold_id] || { name: '', relation: 'SELF' as const };
+                        return (
+                            <div key={h.hold_id} className="p-4 rounded-2xl bg-card border border-line flex flex-col gap-2.5">
+                                <span className="text-[11px] font-extrabold text-muted-foreground uppercase tracking-[0.06em]">Seat #{idx + 1}</span>
+                                <label className="flex flex-col gap-1 text-xs font-bold text-[#4A4766]">
+                                    Passenger name
+                                    <input
+                                        className="h-12 rounded-xl border-[1.5px] border-input bg-card px-3.5 text-[15px] font-semibold text-ink placeholder:text-light-gray outline-none focus:border-iris focus:border-2 disabled:bg-background disabled:text-[#4A4766]"
+                                        placeholder="Enter passenger name"
+                                        value={p.name}
+                                        onChange={(e) => onUpdatePassenger(h.hold_id, { ...p, name: e.target.value })}
+                                        disabled={isStudent} // Students usually just use their name which is prefilled
+                                    />
+                                </label>
+                                {!isStudent && (
+                                    <Select
+                                        options={[
+                                            { value: 'SELF', label: 'Myself' },
+                                            { value: 'SPOUSE', label: 'Spouse' },
+                                            { value: 'CHILD', label: 'Child' },
+                                            { value: 'PARENT', label: 'Parent' },
+                                            { value: 'GUEST', label: 'Guest' },
+                                        ]}
+                                        value={p.relation}
+                                        onChange={(v) => onUpdatePassenger(h.hold_id, { ...p, relation: v as Passenger['relation'] })}
+                                        placeholder="Select relation"
+                                        className="h-12 rounded-xl bg-card border-input font-semibold text-sm"
+                                        showLabel={false}
+                                    />
+                                )}
+                                {isStudent && <span className="text-xs font-bold text-muted-foreground">Relation: Self</span>}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
         </Modal>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useBlocker } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/shared/stores/authStore';
@@ -7,7 +7,6 @@ import { useHoldTimer } from '../hooks';
 import { TransportBookingModeSelector } from '../components/TransportBookingModeSelector';
 import { PendingReservationBanner } from '../components/PendingReservationBanner';
 import { AbandonBookingModal } from '../components/AbandonBookingModal';
-import { TransportBookingCard } from '../components/TransportBookingCard'; // OLD UI - kept for rollback
 import { RouteGrid } from '../components/RouteGrid'; // NEW TILE-BASED UI
 import { BookingConfirmationModal, TripSummary } from '../components/BookingConfirmationModal';
 import { SelectionSummary } from '../components/SelectionSummary';
@@ -45,7 +44,9 @@ export const TransportPage = () => {
         ({ currentLocation, nextLocation }) =>
             activeHolds.length > 0 &&
             currentLocation.pathname !== nextLocation.pathname &&
-            !nextLocation.pathname.includes('/transport/passengers')
+            !nextLocation.pathname.includes('/transport/passengers') &&
+            // After a confirmed booking we go to My Tickets; never ask to "abandon" there.
+            nextLocation.pathname !== '/tickets'
     );
 
     useEffect(() => {
@@ -154,7 +155,7 @@ export const TransportPage = () => {
             }));
             await confirmBooking(confirmations);
             setShowConfirmModal(false);
-            navigate('/transport/tickets');
+            navigate('/tickets');
         } catch (error) {
             console.error('Failed to confirm booking:', error);
         } finally {
@@ -164,8 +165,12 @@ export const TransportPage = () => {
 
     if (!initialized) {
         return (
-            <div className="flex items-center justify-center py-16 text-gray-600">
-                Loading…
+            <div className="max-w-5xl mx-auto w-full flex flex-col gap-3 pt-1" aria-busy="true" aria-label="Loading rides">
+                <div className="h-8 w-32 rounded-lg bg-secondary" />
+                <div className="h-12 rounded-2xl bg-secondary" />
+                {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-[76px] rounded-[22px] bg-card" />
+                ))}
             </div>
         );
     }
@@ -199,13 +204,38 @@ export const TransportPage = () => {
         .filter(h => h.direction?.toUpperCase() === 'INBOUND')
         .map(h => ({ hold_id: h.id, expires_at: h.expires_at }));
 
+    const quota = useTransportStore.getState().quota;
+    const canContinue = useTransportStore.getState().canProceed();
+
+    const SectionTitle = ({ step, done, children }: { step?: string; done?: boolean; children: ReactNode }) => (
+        <div className="flex items-center gap-2.5 px-1">
+            {step && (
+                <span
+                    className={cn(
+                        'size-7 rounded-full flex items-center justify-center text-xs font-extrabold',
+                        done ? 'bg-mint text-white' : 'bg-secondary text-[#4A4766]'
+                    )}
+                    aria-hidden="true"
+                >
+                    {done ? '✓' : step}
+                </span>
+            )}
+            <h2 className="font-display text-xl font-extrabold text-ink">{children}</h2>
+        </div>
+    );
+
     return (
-        <div className="space-y-4">
-            <PendingReservationBanner
-                count={activeHolds.length}
-                timeLeft={timeLeft}
-                onReleaseAll={releaseAllHolds}
-            />
+        <div className="max-w-5xl mx-auto w-full flex flex-col gap-4 pt-1">
+            <header className="flex items-center justify-between gap-3 flex-wrap">
+                <h1 className="font-display font-extrabold text-[32px] tracking-tight text-ink leading-none">Rides</h1>
+                {quota && (
+                    <span className="text-xs font-extrabold text-ink bg-card px-3 py-1.5 rounded-full">
+                        Weekly quota · {quota.outbound.remaining} out · {quota.inbound.remaining} back
+                    </span>
+                )}
+            </header>
+
+            <PendingReservationBanner count={activeHolds.length} timeLeft={timeLeft} onReleaseAll={releaseAllHolds} />
 
             {/* Dynamic Selection Summary (Cart) */}
             <SelectionSummary
@@ -216,109 +246,59 @@ export const TransportPage = () => {
                 activeHolds={activeHolds}
             />
 
-            <div className="grid gap-4">
+            <div className="flex flex-col gap-4">
                 <TransportBookingModeSelector
                     direction={direction}
                     onDirectionChange={setDirection}
                     isRoundTrip={isRoundTrip}
                     onRoundTripChange={setRoundTrip}
-                    quota={useTransportStore.getState().quota}
+                    quota={quota}
                 />
 
-                {/* ROUND-TRIP MODE: Show both directions side-by-side */}
                 {isRoundTrip ? (
-                    <div className="space-y-4">
-                        {/* Simplified Round Trip Banner */}
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2.5">
-                            <div className="flex items-center justify-center gap-2 text-sm font-semibold text-blue-900">
-                                ↔ Round Trip • Select both
-                            </div>
+                    <div className="flex flex-col gap-4">
+                        <p className="text-center text-sm font-bold text-iris-strong bg-iris-tint rounded-2xl py-2.5">Round trip · pick both buses</p>
+
+                        <div className="flex flex-col gap-3">
+                            <SectionTitle step="1" done={!!outboundSelection}>
+                                From GIKI
+                            </SectionTitle>
+                            <RouteGrid direction="OUTBOUND" onBook={handleBook} />
                         </div>
 
-                        {/* Outbound Section */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 px-2">
-                                <div className={cn(
-                                    "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold",
-                                    outboundSelection ? "bg-green-500 text-white" : "bg-gray-300 text-gray-600"
-                                )}>
-                                    {outboundSelection ? '✓' : '1'}
-                                </div>
-                                <h2 className="text-2xl font-bold text-gray-900">
-                                     From GIKI
-                                </h2>
-                            </div>
-                            <RouteGrid
-                                direction="OUTBOUND"
-                                onBook={handleBook}
-                            />
+                        <div className="flex items-center gap-2 px-1" aria-hidden="true">
+                            <div className="flex-1 h-px bg-line" />
+                            <span className="text-xs font-bold text-muted-foreground">Then</span>
+                            <div className="flex-1 h-px bg-line" />
                         </div>
 
-                        {/* Simple Divider */}
-                        <div className="flex items-center gap-2 px-2">
-                            <div className="flex-1 h-px bg-gray-200" />
-                            <span className="text-xs text-gray-400">Then</span>
-                            <div className="flex-1 h-px bg-gray-200" />
-                        </div>
-
-                        {/* Return Section */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2 px-2">
-                                <div className={cn(
-                                    "w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold",
-                                    returnSelection ? "bg-green-500 text-white" : "bg-gray-300 text-gray-600"
-                                )}>
-                                    {returnSelection ? '✓' : '2'}
-                                </div>
-                                <h2 className="text-2xl font-bold text-gray-900">
-                                     To GIKI
-                                </h2>
-                            </div>
-                            <RouteGrid
-                                direction="INBOUND"
-                                onBook={handleBook}
-                            />
+                        <div className="flex flex-col gap-3">
+                            <SectionTitle step="2" done={!!returnSelection}>
+                                To GIKI
+                            </SectionTitle>
+                            <RouteGrid direction="INBOUND" onBook={handleBook} />
                         </div>
                     </div>
                 ) : (
-                    /* SINGLE-TRIP MODE: Show only selected direction */
-                    <div className="space-y-3">
-                        <h2 className="text-2xl font-bold text-gray-900 px-2">
-                            {direction === 'OUTBOUND' ? ' From GIKI' : ' To GIKI'}
-                        </h2>
-                        
-                        <RouteGrid
-                            direction={direction}
-                            onBook={handleBook}
-                        />
+                    <div className="flex flex-col gap-3">
+                        <SectionTitle>{direction === 'OUTBOUND' ? 'From GIKI' : 'To GIKI'}</SectionTitle>
+                        <RouteGrid direction={direction} onBook={handleBook} />
                     </div>
                 )}
 
                 {activeHolds.length > 0 && (
-                    <div className="pt-3 flex flex-col items-center gap-2 sticky bottom-6 z-10">
-                        {/* Compact Progress Indicator for Round Trip */}
+                    <div className="sticky bottom-[84px] md:bottom-6 z-10 flex flex-col items-center gap-2 pt-2">
                         {isRoundTrip && (
-                            <div className="bg-white border border-gray-200 rounded-full px-3 py-1 shadow-sm">
-                                <div className="flex items-center gap-1.5 text-xs">
-                                    <span className={outboundSelection ? "text-green-600" : "text-gray-400"}>
-                                        {outboundSelection ? "✓" : "○"}
-                                    </span>
-                                    <span className="text-gray-300">•</span>
-                                    <span className={returnSelection ? "text-green-600" : "text-gray-400"}>
-                                        {returnSelection ? "✓" : "○"}
-                                    </span>
-                                </div>
+                            <div className="bg-card rounded-full px-3 py-1 shadow-sm text-xs font-bold flex items-center gap-1.5">
+                                <span className={outboundSelection ? 'text-mint' : 'text-light-gray'}>{outboundSelection ? '✓ Going' : '○ Going'}</span>
+                                <span className="text-light-gray">·</span>
+                                <span className={returnSelection ? 'text-mint' : 'text-light-gray'}>{returnSelection ? '✓ Return' : '○ Return'}</span>
                             </div>
                         )}
-                        
                         <button
-                            className={cn(
-                                "px-8 py-3 rounded-xl font-semibold text-sm shadow-lg transition-all",
-                                (isRoundTrip && outboundSelection && returnSelection) || (!isRoundTrip && (outboundSelection || returnSelection))
-                                    ? "bg-gray-900 text-white hover:bg-gray-800"
-                                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                            )}
-                            disabled={!useTransportStore.getState().canProceed()}
+                            type="button"
+                            className="w-full max-w-md h-14 rounded-[18px] bg-ink text-white text-base font-extrabold shadow-lg shadow-ink/20 disabled:bg-secondary disabled:text-[#6E6B88] disabled:shadow-none disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                            disabled={!canContinue}
                             onClick={() => {
                                 if (useTransportStore.getState().canProceed()) {
                                     if (isStudent) {
@@ -329,9 +309,7 @@ export const TransportPage = () => {
                                 }
                             }}
                         >
-                            {isRoundTrip
-                                ? (outboundSelection && returnSelection ? "Confirm Booking" : "Select Both Trips")
-                                : "Continue"}
+                            {isRoundTrip ? (outboundSelection && returnSelection ? 'Confirm Booking' : 'Select Both Trips') : 'Continue'}
                         </button>
                     </div>
                 )}

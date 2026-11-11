@@ -1,9 +1,8 @@
-import { MapPin, ArrowRight, CheckCircle2, CircleDashed } from 'lucide-react';
+import { ArrowRight, Check, CircleDashed, PencilLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTime } from '../utils';
 import type { Trip, BookingSelection } from '../validators';
 import { useTransportStore } from '../store';
-import { PencilLine } from 'lucide-react';
 
 interface SelectionSummaryProps {
     isRoundTrip: boolean;
@@ -13,30 +12,87 @@ interface SelectionSummaryProps {
     activeHolds: Array<{ id: string; trip_id: string; direction: string }>;
 }
 
-export function SelectionSummary({
-    isRoundTrip,
-    allTrips,
-    outboundSelection,
-    returnSelection,
-    activeHolds
-}: SelectionSummaryProps) {
+type LegData = { route: string; departure: string; pickup: string; dropoff: string; isHeld: boolean } | null;
+
+const Leg = ({
+    label,
+    data,
+    active,
+    onEdit,
+    status,
+    emptyText,
+}: {
+    label: string;
+    data: LegData;
+    active: boolean;
+    onEdit: () => void;
+    status: 'held' | 'pending' | 'next' | null;
+    emptyText: string;
+}) => (
+    <button
+        type="button"
+        onClick={onEdit}
+        aria-pressed={active}
+        className={cn(
+            'flex-1 text-left p-4 rounded-2xl transition-colors focus-visible:outline-2 focus-visible:outline-iris',
+            active ? 'ring-2 ring-iris' : 'hover:bg-secondary/40',
+            data?.isHeld ? 'bg-mint-tint/60' : 'bg-background'
+        )}
+    >
+        <span className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-extrabold uppercase tracking-[0.06em] text-muted-foreground">{label}</span>
+            <span className="flex items-center gap-2">
+                {status === 'held' && (
+                    <span className="flex items-center gap-1 text-mint text-[11px] font-extrabold uppercase">
+                        <Check className="size-3.5" strokeWidth={3} aria-hidden="true" />
+                        Seat held
+                    </span>
+                )}
+                {(status === 'pending' || status === 'next') && (
+                    <span className="flex items-center gap-1 text-signal-text text-[11px] font-extrabold uppercase">
+                        {status === 'pending' ? 'Pending' : 'Next step'}
+                        <CircleDashed className="size-3.5 animate-spin-slow" aria-hidden="true" />
+                    </span>
+                )}
+                <PencilLine className={cn('size-3.5', active ? 'text-ink' : 'text-light-gray')} aria-hidden="true" />
+            </span>
+        </span>
+        {data ? (
+            <span className="flex flex-col gap-1">
+                <span className="flex items-baseline gap-2 flex-wrap">
+                    <span className="text-sm font-extrabold text-ink">{data.route}</span>
+                    <span className="text-[11px] text-muted-foreground">{data.departure}</span>
+                </span>
+                <span className="flex items-center gap-2 text-xs text-[#4A4766]">
+                    <span className="truncate max-w-[140px]">{data.pickup}</span>
+                    <ArrowRight className="size-3 shrink-0 text-light-gray" aria-hidden="true" />
+                    <span className="truncate max-w-[140px]">{data.dropoff}</span>
+                </span>
+            </span>
+        ) : (
+            <span className="h-10 flex items-center text-xs text-muted-foreground font-semibold">{emptyText}</span>
+        )}
+    </button>
+);
+
+export function SelectionSummary({ isRoundTrip, allTrips, outboundSelection, returnSelection, activeHolds }: SelectionSummaryProps) {
     const { direction, setDirection } = useTransportStore();
 
-    const getTripData = (selection: BookingSelection | null) => {
+    const getTripData = (selection: BookingSelection | null): LegData => {
         if (!selection) return null;
-        const trip = allTrips.find(t => t.id === selection.tripId);
+        const trip = allTrips.find((t) => t.id === selection.tripId);
         if (!trip) return null;
 
-        const pickup = trip.stops.find(s => s.stop_id === selection.pickupId)?.stop_name || '...';
-        const dropoff = trip.stops.find(s => s.stop_id === selection.dropoffId)?.stop_name || '...';
-        const isHeld = activeHolds.some(h => h.trip_id === selection.tripId);
+        const pickup = trip.stops.find((s) => s.stop_id === selection.pickupId)?.stop_name || '...';
+        const dropoff = trip.stops.find((s) => s.stop_id === selection.dropoffId)?.stop_name || '...';
+        const isHeld = activeHolds.some((h) => h.trip_id === selection.tripId);
 
         return {
             route: trip.route_name,
             departure: `${formatDate(trip.departure_time)} @ ${formatTime(trip.departure_time)}`,
             pickup,
             dropoff,
-            isHeld
+            isHeld,
         };
     };
 
@@ -46,103 +102,25 @@ export function SelectionSummary({
     if (!outboundSelection && !returnSelection) return null;
 
     return (
-        <div className="bg-white border border-slate-200 rounded-[2rem] p-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="flex flex-col md:flex-row items-stretch gap-3">
-                {/* Outbound Leg */}
-                <div
-                    onClick={() => setDirection('OUTBOUND')}
-                    className={cn(
-                        "flex-1 p-4 rounded-2xl border transition-all duration-300 cursor-pointer group",
-                        direction === 'OUTBOUND' ? "ring-2 ring-slate-900 border-transparent shadow-md" : "hover:border-slate-300",
-                        outbound?.isHeld ? "bg-emerald-50/50 border-emerald-100" : "bg-slate-50 border-slate-100"
-                    )}
-                >
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Outbound Trip</span>
-                        <div className="flex items-center gap-2">
-                            {outbound?.isHeld ? (
-                                <div className="flex items-center gap-1 text-emerald-600">
-                                    <span className="text-[10px] font-bold uppercase">Seat Held</span>
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                </div>
-                            ) : outbound ? (
-                                <div className="flex items-center gap-1 text-amber-500">
-                                    <span className="text-[10px] font-bold uppercase">Pending</span>
-                                    <CircleDashed className="w-3.5 h-3.5 animate-spin-slow" />
-                                </div>
-                            ) : null}
-                            <PencilLine className={cn(
-                                "w-3.5 h-3.5 transition-colors",
-                                direction === 'OUTBOUND' ? "text-slate-900" : "text-slate-300 group-hover:text-slate-500"
-                            )} />
-                        </div>
-                    </div>
-                    {outbound ? (
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-slate-900">{outbound.route}</span>
-                                <span className="text-[10px] text-slate-400">{outbound.departure}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-600">
-                                <span className="truncate max-w-[120px]">{outbound.pickup}</span>
-                                <ArrowRight className="w-3 h-3 flex-shrink-0 text-slate-300" />
-                                <span className="truncate max-w-[120px]">{outbound.dropoff}</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="h-10 flex items-center text-xs text-slate-400 font-medium italic">
-                            Select an outbound trip...
-                        </div>
-                    )}
-                </div>
-
+        <div className="bg-card rounded-[22px] p-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div className="flex flex-col md:flex-row items-stretch gap-2.5">
+                <Leg
+                    label="Outbound trip"
+                    data={outbound}
+                    active={direction === 'OUTBOUND'}
+                    onEdit={() => setDirection('OUTBOUND')}
+                    status={outbound?.isHeld ? 'held' : outbound ? 'pending' : null}
+                    emptyText="Select an outbound trip..."
+                />
                 {isRoundTrip && (
-                    <div
-                        onClick={() => setDirection('INBOUND')}
-                        className={cn(
-                            "flex-1 p-4 rounded-2xl border transition-all duration-300 cursor-pointer group",
-                            direction === 'INBOUND' ? "ring-2 ring-slate-900 border-transparent shadow-md" : "hover:border-slate-300",
-                            returnTrip?.isHeld ? "bg-emerald-50/50 border-emerald-100" : "bg-slate-50 border-slate-100"
-                        )}
-                    >
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Return Trip</span>
-                            <div className="flex items-center gap-2">
-                                {returnTrip?.isHeld ? (
-                                    <div className="flex items-center gap-1 text-emerald-600">
-                                        <span className="text-[10px] font-bold uppercase">Seat Held</span>
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                    </div>
-                                ) : outbound?.isHeld ? (
-                                    <div className="flex items-center gap-1 text-amber-600">
-                                        <span className="text-[10px] font-bold uppercase text-amber-500">Next Step</span>
-                                        <CircleDashed className="w-3.5 h-3.5 animate-spin-slow" />
-                                    </div>
-                                ) : null}
-                                <PencilLine className={cn(
-                                    "w-3.5 h-3.5 transition-colors",
-                                    direction === 'INBOUND' ? "text-slate-900" : "text-slate-300 group-hover:text-slate-500"
-                                )} />
-                            </div>
-                        </div>
-                        {returnTrip ? (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-slate-900">{returnTrip.route}</span>
-                                    <span className="text-[10px] text-slate-400">{returnTrip.departure}</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-slate-600">
-                                    <span className="truncate max-w-[120px]">{returnTrip.pickup}</span>
-                                    <ArrowRight className="w-3 h-3 flex-shrink-0 text-slate-300" />
-                                    <span className="truncate max-w-[120px]">{returnTrip.dropoff}</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="h-10 flex items-center text-xs text-slate-400 font-medium italic">
-                                {outbound?.isHeld ? "Waiting for selection..." : "Select outbound first"}
-                            </div>
-                        )}
-                    </div>
+                    <Leg
+                        label="Return trip"
+                        data={returnTrip}
+                        active={direction === 'INBOUND'}
+                        onEdit={() => setDirection('INBOUND')}
+                        status={returnTrip?.isHeld ? 'held' : outbound?.isHeld ? 'next' : null}
+                        emptyText={outbound?.isHeld ? 'Waiting for selection...' : 'Select outbound first'}
+                    />
                 )}
             </div>
         </div>

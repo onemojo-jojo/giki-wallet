@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Bus, Clock, MapPin, Users, Lock, ChevronDown } from 'lucide-react';
-import { Button } from '@/shared/components/ui/button';
+import { Bus, MapPin, Users, Lock, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatTime12, formatDate, getCityName } from '../utils';
 import type { Trip } from '../validators';
@@ -123,185 +122,152 @@ export const RouteCard = ({
     // Shortened city name
     const cityName = getCityName(routeName);
 
+    const busType = (trips[0]?.bus_type || 'STUDENT').toUpperCase();
+
     return (
-        <div className={cn(
-            "bg-white border-2 rounded-2xl transition-all duration-300 overflow-hidden",
-            expanded
-                ? (selectedTripId ? "border-primary shadow-lg" : "border-gray-300 shadow-md")
-                : "border-gray-200 hover:border-gray-300 hover:shadow-sm"
-        )}>
-            {/* Clickable Header — Always Visible */}
+        <div
+            className={cn(
+                'bg-card rounded-[22px] transition-shadow overflow-hidden',
+                expanded ? (selectedTripId ? 'ring-2 ring-iris shadow-md' : 'shadow-sm') : 'hover:shadow-sm'
+            )}
+        >
+            {/* Header — always visible */}
             <button
+                type="button"
                 onClick={() => setExpanded(!expanded)}
-                className="w-full p-4 flex items-center justify-between gap-3 text-left"
+                aria-expanded={expanded}
+                className="w-full p-4 flex items-center justify-between gap-3 text-left rounded-[22px] focus-visible:outline-2 focus-visible:outline-iris"
             >
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
-                        expanded ? "bg-primary/15" : "bg-gray-100"
-                    )}>
-                        <Bus className={cn("w-5 h-5", expanded ? "text-primary" : "text-gray-500")} />
-                    </div>
-                    <div className="min-w-0">
-                        <h3 className="font-bold text-base text-gray-900 truncate">{cityName}</h3>
+                <span className="flex items-center gap-3 min-w-0">
+                    <span className={cn('size-11 rounded-[14px] flex items-center justify-center shrink-0', expanded ? 'bg-iris text-white' : 'bg-iris-tint text-iris-strong')}>
+                        <Bus className="size-5" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex flex-col gap-0.5">
+                        <span className="font-display font-extrabold text-lg text-ink leading-tight break-words">{cityName}</span>
                         {!expanded && (
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                {summaryInfo.allFull
-                                    ? <span className="text-red-500 font-semibold">All trips full</span>
-                                    : summaryInfo.allScheduled
-                                        ? <span className="text-blue-600 font-semibold">Not open yet</span>
-                                        : <span>{summaryInfo.totalTrips} trip{summaryInfo.totalTrips !== 1 ? 's' : ''} • {summaryInfo.totalSeats} seats</span>
-                                }
-                            </p>
+                            <span className="text-xs font-semibold">
+                                {summaryInfo.allFull ? (
+                                    <span className="text-coral">All trips full</span>
+                                ) : summaryInfo.allScheduled ? (
+                                    <span className="text-signal-text">Not open yet</span>
+                                ) : (
+                                    <span className="text-muted-foreground">
+                                        {summaryInfo.totalTrips} trip{summaryInfo.totalTrips !== 1 ? 's' : ''} · {summaryInfo.totalSeats} seats
+                                    </span>
+                                )}
+                            </span>
                         )}
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                    </span>
+                </span>
+                <span className="flex items-center gap-2 shrink-0">
                     {!expanded && (
-                        <span className={cn(
-                            "px-2 py-0.5 text-[10px] rounded-full font-semibold uppercase",
-                            trips[0]?.bus_type === 'EMPLOYEE'
-                                ? "bg-primary/10 text-primary"
-                                : "bg-accent/10 text-accent"
-                        )}>
-                            {trips[0]?.bus_type || 'STUDENT'}
+                        <span className={cn('px-2.5 py-0.5 text-[11px] rounded-full font-extrabold uppercase', busType === 'EMPLOYEE' ? 'bg-ink text-white' : 'bg-iris-tint text-iris-strong')}>
+                            {busType}
                         </span>
                     )}
-                    {isHeld && (
-                        <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded-full">
-                            Reserved
-                        </span>
-                    )}
-                    <ChevronDown className={cn(
-                        "w-5 h-5 text-gray-400 transition-transform duration-300",
-                        expanded && "rotate-180"
-                    )} />
-                </div>
+                    {isHeld && <span className="px-2.5 py-0.5 bg-mint-tint text-mint text-[11px] font-extrabold rounded-full">Reserved</span>}
+                    <ChevronDown className={cn('size-5 text-light-gray transition-transform duration-300', expanded && 'rotate-180')} aria-hidden="true" />
+                </span>
             </button>
 
-            {/* Expandable Content */}
-            <div className={cn(
-                "transition-all duration-300 ease-in-out overflow-hidden",
-                expanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-            )}>
-                <div className="px-4 pb-4 space-y-4">
-                    {/* Time Slots */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                            Select Trip
-                        </label>
-                        <div className="space-y-2">
-                            {trips.length === 0 ? (
-                                <div className="text-center py-6 text-gray-400 text-sm">
-                                    No trips available
-                                </div>
-                            ) : (
-                                trips.map((trip) => {
-                                    const tripFull = trip.available_seats <= 0 || trip.status === 'FULL';
-                                    const tripScheduled = trip.status === 'SCHEDULED';
-                                    const tripCancelled = trip.status === 'CANCELLED';
-                                    const tripClosed = trip.status === 'CLOSED';
-                                    const isDisabled = tripFull || tripScheduled || tripCancelled || tripClosed;
+            {/* Expandable content */}
+            <div className={cn('transition-all duration-300 ease-in-out overflow-hidden', expanded ? 'max-h-[1400px] opacity-100' : 'max-h-0 opacity-0')}>
+                <div className="px-4 pb-4 flex flex-col gap-4">
+                    <fieldset className="flex flex-col gap-2">
+                        <legend className="text-xs font-extrabold text-muted-foreground uppercase tracking-[0.06em] mb-2">Select trip</legend>
+                        {trips.length === 0 ? (
+                            <div className="text-center py-6 text-muted-foreground text-sm">No trips available</div>
+                        ) : (
+                            trips.map((trip) => {
+                                const tripFull = trip.available_seats <= 0 || trip.status === 'FULL';
+                                const tripScheduled = trip.status === 'SCHEDULED';
+                                const tripCancelled = trip.status === 'CANCELLED';
+                                const tripClosed = trip.status === 'CLOSED';
+                                const isDisabled = tripFull || tripScheduled || tripCancelled || tripClosed;
+                                const selected = selectedTripId === trip.id;
+                                const lowSeats = !isDisabled && trip.available_seats <= 5;
+                                const [time, ampm] = formatTime12(trip.departure_time).split(' ');
 
-                                    return (
-                                        <label
-                                            key={trip.id}
-                                            className={cn(
-                                                "flex items-center justify-between gap-2 p-2 sm:p-3 border-2 rounded-xl cursor-pointer transition-all",
-                                                selectedTripId === trip.id
-                                                    ? "border-primary bg-primary/5"
-                                                    : "border-gray-200 hover:border-gray-300 hover:bg-gray-50",
-                                                isDisabled && "opacity-60 cursor-not-allowed",
-                                                tripScheduled && "bg-blue-50/50 border-blue-200",
-                                                tripCancelled && "bg-red-50 border-red-200"
-                                            )}
-                                        >
-                                            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
-                                                <input
-                                                    type="radio"
-                                                    name={`trip-${routeId}`}
-                                                    value={trip.id}
-                                                    checked={selectedTripId === trip.id}
-                                                    onChange={() => {
-                                                        if (!isDisabled) {
-                                                            setSelectedTripId(trip.id);
-                                                            setSelectedStopId(null);
-                                                            setTicketCount(1);
-                                                        }
-                                                    }}
-                                                    disabled={isDisabled}
-                                                    className="w-4 h-4 text-primary"
-                                                />
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <Clock className="w-4 h-4 text-gray-400" />
-                                                        <span className="font-semibold text-sm">
-                                                            {formatTime12(trip.departure_time)}
-                                                        </span>
-                                                    </div>
-                                                    <span className="text-[10px] text-gray-400 font-medium ml-6">
-                                                        {formatDate(trip.departure_time)}
+                                return (
+                                    <label
+                                        key={trip.id}
+                                        className={cn(
+                                            'flex items-center gap-3 p-3 rounded-2xl transition-colors',
+                                            selected ? 'bg-[#F6F4FF] ring-2 ring-iris' : 'bg-background',
+                                            isDisabled ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-secondary/60',
+                                            tripScheduled && !selected && 'bg-signal-tint/60',
+                                            tripCancelled && 'bg-coral-tint'
+                                        )}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name={`trip-${routeId}`}
+                                            value={trip.id}
+                                            checked={selected}
+                                            onChange={() => {
+                                                if (!isDisabled) {
+                                                    setSelectedTripId(trip.id);
+                                                    setSelectedStopId(null);
+                                                    setTicketCount(1);
+                                                }
+                                            }}
+                                            disabled={isDisabled}
+                                            className="size-5 accent-iris shrink-0"
+                                        />
+                                        <span className="flex flex-col w-16 shrink-0">
+                                            <span className={cn('font-display text-xl font-extrabold leading-none tracking-tight', isDisabled ? 'text-muted-foreground' : 'text-ink')}>{time}</span>
+                                            <span className="text-[11px] font-extrabold text-muted-foreground">{ampm}</span>
+                                        </span>
+                                        <span className="flex-1 min-w-0 text-xs font-semibold text-muted-foreground">{formatDate(trip.departure_time)}</span>
+                                        <span className="flex flex-col items-end gap-0.5 shrink-0 text-right">
+                                            {tripCancelled ? (
+                                                <span className="text-xs text-coral font-extrabold uppercase">Cancelled</span>
+                                            ) : tripClosed ? (
+                                                <span className="text-xs text-muted-foreground font-extrabold uppercase">Closed</span>
+                                            ) : tripScheduled ? (
+                                                <>
+                                                    <span className="flex items-center gap-1 text-[11px] font-extrabold uppercase text-signal-text">
+                                                        <Lock className="size-3" aria-hidden="true" />
+                                                        Locked
                                                     </span>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-end gap-1 min-w-0 flex-shrink-0">
-                                                {tripCancelled ? (
-                                                    <span className="text-xs text-red-700 font-bold uppercase whitespace-nowrap">CANCELLED</span>
-                                                ) : tripClosed ? (
-                                                    <span className="text-xs text-gray-500 font-bold uppercase whitespace-nowrap">CLOSED</span>
-                                                ) : tripScheduled ? (
-                                                    <>
-                                                        <div className="flex items-center gap-1 bg-blue-100 px-1.5 py-0.5 rounded-md">
-                                                            <Lock className="w-3 h-3 text-blue-700 flex-shrink-0" />
-                                                            <span className="text-[10px] text-blue-700 font-bold uppercase whitespace-nowrap">
-                                                                Locked
-                                                            </span>
-                                                        </div>
-                                                        <span className="text-[10px] text-blue-600 font-semibold whitespace-nowrap">
-                                                            {getTimeRemaining(trip.booking_opens_at)}
-                                                        </span>
-                                                        <span className="text-[9px] text-gray-500 whitespace-nowrap">
-                                                            @ {formatTime12(trip.booking_opens_at)}
-                                                        </span>
-                                                    </>
-                                                ) : tripFull ? (
-                                                    <span className="text-xs text-red-600 font-bold whitespace-nowrap">FULL</span>
-                                                ) : (
-                                                    <div className="flex items-center gap-1.5">
-                                                        <Users className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
-                                                        <span className="font-bold text-sm text-gray-900">
-                                                            {trip.available_seats}
-                                                        </span>
-                                                        <span className="text-xs text-gray-400 font-medium">
-                                                            / {trip.total_capacity}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </label>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </div>
+                                                    <span className="text-[11px] font-bold text-signal-text whitespace-nowrap">{getTimeRemaining(trip.booking_opens_at)}</span>
+                                                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">@ {formatTime12(trip.booking_opens_at)}</span>
+                                                </>
+                                            ) : tripFull ? (
+                                                <span className="text-xs text-coral font-extrabold uppercase">Full</span>
+                                            ) : (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Users className={cn('size-3.5', lowSeats ? 'text-[#B35F00]' : 'text-mint')} aria-hidden="true" />
+                                                    <span className={cn('font-extrabold text-sm', lowSeats ? 'text-[#B35F00]' : 'text-ink')}>{trip.available_seats}</span>
+                                                    <span className="text-xs text-muted-foreground font-semibold">/ {trip.total_capacity}</span>
+                                                </span>
+                                            )}
+                                        </span>
+                                    </label>
+                                );
+                            })
+                        )}
+                    </fieldset>
 
-                    {/* Stop Selection — Tappable Chips */}
+                    {/* Stop selection */}
                     {selectedTripId && stopOptions.length > 0 && (
-                        <div>
-                            <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">
-                                <MapPin className="w-3 h-3" />
-                                {direction === 'OUTBOUND' ? 'Drop-off Location' : 'Pickup Location'}
+                        <div role="group" aria-label={direction === 'OUTBOUND' ? 'Drop-off location' : 'Pickup location'}>
+                            <div className="flex items-center gap-1.5 text-xs font-extrabold text-muted-foreground uppercase tracking-[0.06em] mb-2">
+                                <MapPin className="size-3.5" aria-hidden="true" />
+                                {direction === 'OUTBOUND' ? 'Drop-off location' : 'Pickup location'}
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {stopOptions.map(stop => (
+                                {stopOptions.map((stop) => (
                                     <button
                                         key={stop.value}
+                                        type="button"
+                                        aria-pressed={selectedStopId === stop.value}
                                         onClick={() => setSelectedStopId(stop.value)}
                                         className={cn(
-                                            "px-3 py-2 rounded-xl text-sm font-medium transition-all border-2",
+                                            'h-10 px-3.5 rounded-xl text-sm transition-colors focus-visible:outline-2 focus-visible:outline-iris',
                                             selectedStopId === stop.value
-                                                ? "border-primary bg-primary/10 text-primary shadow-sm"
-                                                : "border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-gray-100"
+                                                ? 'bg-iris text-white font-extrabold'
+                                                : 'bg-background border-[1.5px] border-input text-ink font-semibold hover:bg-secondary'
                                         )}
                                     >
                                         {stop.label}
@@ -311,45 +277,47 @@ export const RouteCard = ({
                         </div>
                     )}
 
-                    {/* Ticket Count (only if stop selected) */}
+                    {/* Ticket count (employees) */}
                     {selectedTripId && selectedStopId && !isStudent && (
                         <div>
-                            <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-2">
-                                Number of Tickets
-                            </label>
-                            <div className="flex items-center gap-3">
+                            <span id={`tickets-${routeId}`} className="text-xs font-extrabold text-muted-foreground uppercase tracking-[0.06em] block mb-2">
+                                Number of tickets
+                            </span>
+                            <div className="flex items-center gap-3" role="group" aria-labelledby={`tickets-${routeId}`}>
                                 <button
+                                    type="button"
                                     onClick={() => setTicketCount(Math.max(1, ticketCount - 1))}
                                     disabled={ticketCount <= 1}
-                                    className="w-10 h-10 rounded-lg border-2 border-gray-300 hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed font-bold text-lg"
+                                    aria-label="One fewer ticket"
+                                    className="size-11 rounded-xl bg-secondary text-ink font-extrabold text-xl disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-iris"
                                 >
                                     −
                                 </button>
-                                <span className="text-2xl font-bold text-gray-900 min-w-[3ch] text-center">
+                                <span className="font-display text-2xl font-extrabold text-ink min-w-[2ch] text-center" aria-live="polite">
                                     {ticketCount}
                                 </span>
                                 <button
+                                    type="button"
                                     onClick={() => setTicketCount(Math.min(maxTickets, ticketCount + 1))}
                                     disabled={ticketCount >= maxTickets}
-                                    className="w-10 h-10 rounded-lg border-2 border-gray-300 hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed font-bold text-lg"
+                                    aria-label="One more ticket"
+                                    className="size-11 rounded-xl bg-secondary text-ink font-extrabold text-xl disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-iris"
                                 >
                                     +
                                 </button>
-                                <span className="text-xs text-gray-500 ml-2">
-                                    Max: {maxTickets}
-                                </span>
+                                <span className="text-xs font-semibold text-muted-foreground ml-1">Max: {maxTickets}</span>
                             </div>
                         </div>
                     )}
 
-                    {/* Book Button */}
-                    <Button
-                        className="w-full h-12 text-base font-bold"
+                    <button
+                        type="button"
                         disabled={!canBook}
                         onClick={handleBook}
+                        className="min-h-[52px] rounded-2xl bg-ink text-white text-base font-extrabold disabled:bg-secondary disabled:text-[#6E6B88] disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
                     >
-                        {isHeld ? 'Reserved' : isClosed ? 'Closed' : (isFull ? 'Fully Booked' : (isScheduled ? 'Not Open Yet' : (isRoundTrip ? 'Select Trip' : 'Book Now →')))}
-                    </Button>
+                        {isHeld ? 'Reserved' : isClosed ? 'Closed' : isFull ? 'Fully Booked' : isScheduled ? 'Not Open Yet' : isRoundTrip ? 'Select Trip' : 'Book Now →'}
+                    </button>
                 </div>
             </div>
         </div>

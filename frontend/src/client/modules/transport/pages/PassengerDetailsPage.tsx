@@ -5,14 +5,13 @@ import { useTransportStore } from '../store';
 import { useHoldTimer } from '../hooks';
 import { PendingReservationBanner } from '../components/PendingReservationBanner';
 import { AbandonBookingModal } from '../components/AbandonBookingModal';
-import { Button } from '@/shared/components/ui/button';
 import { Select } from '@/shared/components/ui/Select';
 import { Input } from '@/shared/components/ui/Input';
 import { cn } from '@/lib/utils';
-import { User, Users, ChevronLeft } from 'lucide-react';
+import { User, ChevronLeft } from 'lucide-react';
 import { BookingConfirmationModal, TripSummary } from '../components/BookingConfirmationModal';
 import { formatDate, formatTime } from '../utils';
-import type { BookingSelection } from '../validators';
+import type { BookingSelection, Passenger } from '../validators';
 
 export const PassengerDetailsPage = () => {
     const navigate = useNavigate();
@@ -37,7 +36,7 @@ export const PassengerDetailsPage = () => {
         ({ currentLocation, nextLocation }) =>
             activeHolds.length > 0 &&
             currentLocation.pathname !== nextLocation.pathname &&
-            nextLocation.pathname !== '/transport/tickets'
+            nextLocation.pathname !== '/tickets'
     );
 
     // Redirect if no holds
@@ -99,7 +98,7 @@ export const PassengerDetailsPage = () => {
             }));
             await confirmBooking(confirmations);
             setShowConfirmModal(false);
-            navigate('/transport/tickets');
+            navigate('/tickets');
         } catch (error) {
             console.error('Failed to confirm booking:', error);
         } finally {
@@ -110,9 +109,9 @@ export const PassengerDetailsPage = () => {
     if (activeHolds.length === 0) return null;
 
     return (
-        <div className="space-y-6 max-w-2xl mx-auto pb-32 md:pb-20">
+        <div className="flex flex-col gap-5 max-w-2xl mx-auto w-full pb-32 md:pb-8 pt-1">
             {/* Header / Timer */}
-            <div className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur pt-4 pb-2">
+            <div className="sticky top-16 md:top-20 z-10 bg-background/95 backdrop-blur pt-1 pb-2 -mx-1 px-1">
                 <PendingReservationBanner
                     count={activeHolds.length}
                     timeLeft={timeLeft}
@@ -123,37 +122,28 @@ export const PassengerDetailsPage = () => {
                 />
             </div>
 
-            <div className="flex items-center gap-2 mb-6">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/transport')}>
-                    <ChevronLeft className="w-5 h-5 text-gray-500" />
-                </Button>
+            <div className="flex items-center gap-3">
+                <button
+                    type="button"
+                    onClick={() => navigate('/transport')}
+                    aria-label="Back to rides"
+                    className="size-11 rounded-[14px] bg-card text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                >
+                    <ChevronLeft className="size-[22px]" strokeWidth={2.2} />
+                </button>
                 <div>
-                    <h1 className="text-2xl font-black text-gray-900 tracking-tight">Passenger Details</h1>
-                    <p className="text-gray-500 text-sm">Who are these tickets for?</p>
+                    <h1 className="font-display text-2xl font-extrabold text-ink tracking-tight">Passenger Details</h1>
+                    <p className="text-sm text-muted-foreground">Who are these tickets for?</p>
                 </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="flex flex-col gap-3">
                 {activeHolds.map((h, idx) => {
-                    const p = passengers[h.id] || { name: '', relation: 'GUEST' }; // Default to GUEST or similar if empty, but logic usually inits it. store.ts init might need check.
-                    // Actually store.ts addSelection inits to SELF? No, logic in store init:
-                    // newPassengers[h.hold_id] = { name: user?.name, relation: 'SELF' };
-                    // Wait, if store inits to SELF for ALL, then we have multiple SELF?
-                    // store.ts implementation: 
-                    // resp.holds.forEach(h => { newPassengers[h.hold_id] = { name: user?.name, relation: 'SELF' }; });
-                    // This violates "Max 1 Self".
-                    // I should fix store.ts init logic OR fix it here by default.
-                    // But for now, let's just implement the UI. 
-
+                    // Store inits each hold's passenger; fall back to an empty guest entry.
+                    const p = passengers[h.id] || { name: '', relation: 'GUEST' };
                     const isSelf = p.relation === 'SELF';
 
-                    // Logic: If someone ELSE is self, I cannot be self.
-                    // const isSelfSelected = Object.values(passengers).some(p => p.relation === 'SELF');
-                    // But if *I* am self, I contribute to isSelfSelected.
-                    // So canSelectSelf = !isSelfSelected || isSelf;
-                    // Wait, if isSelfSelected is true, and I am NOT self, canSelectSelf is false. Correct.
-                    // If isSelfSelected is true, and I AM self, canSelectSelf is true. Correct.
-
+                    // Only one passenger can be "Myself": hide that option for others once it's taken.
                     const canSelectSelf = !isSelfSelected || isSelf;
 
                     const options = [
@@ -162,28 +152,36 @@ export const PassengerDetailsPage = () => {
                         { value: 'CHILD', label: 'Child' },
                         { value: 'PARENT', label: 'Parent' },
                         { value: 'GUEST', label: 'Guest' },
-                    ].filter(opt => opt.value !== 'SELF' || canSelectSelf);
+                    ].filter((opt) => opt.value !== 'SELF' || canSelectSelf);
 
                     return (
-                        <div key={h.id} className="p-4 rounded-xl border border-slate-200 bg-white/50 shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 text-[10px]">{idx + 1}</span>
-                                    Ticket #{idx + 1}
+                        <section key={h.id} aria-label={`Ticket ${idx + 1}`} className="p-4 rounded-[20px] bg-card flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-2.5">
+                                    <span
+                                        className={cn(
+                                            'size-9 rounded-xl flex items-center justify-center font-display font-extrabold text-sm',
+                                            isSelf ? 'bg-ink text-volt' : 'bg-iris-tint text-iris-strong'
+                                        )}
+                                    >
+                                        {isSelf ? <User className="size-4" aria-hidden="true" /> : idx + 1}
+                                    </span>
+                                    <span className="text-xs font-extrabold text-muted-foreground uppercase tracking-[0.06em]">Ticket #{idx + 1}</span>
                                 </span>
                                 {h.direction && (
-                                    <span className={cn(
-                                        "text-[10px] uppercase font-bold px-2 py-0.5 rounded-full",
-                                        h.direction?.toUpperCase() === 'OUTBOUND' ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
-                                    )}>
+                                    <span
+                                        className={cn(
+                                            'text-[11px] uppercase font-extrabold px-2.5 py-0.5 rounded-full',
+                                            h.direction?.toUpperCase() === 'OUTBOUND' ? 'bg-iris-tint text-iris-strong' : 'bg-mint-tint text-mint'
+                                        )}
+                                    >
                                         {h.direction}
                                     </span>
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {/* Relation Select */}
-                                <div className="md:col-span-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                <div className="sm:col-span-1">
                                     <Select
                                         label="Relation"
                                         options={options}
@@ -194,51 +192,48 @@ export const PassengerDetailsPage = () => {
                                             } else {
                                                 // If switching from SELF, clear name. Else keep it.
                                                 const newName = p.relation === 'SELF' ? '' : p.name;
-                                                updatePassenger(h.id, { name: newName, relation: val as any });
+                                                updatePassenger(h.id, { name: newName, relation: val as Passenger['relation'] });
                                             }
                                         }}
-                                        placeholder="Select Relation" // This won't show if value is set
-                                        className="h-11 bg-white"
+                                        placeholder="Select Relation"
+                                        className="h-12 rounded-xl bg-card border-input font-semibold"
                                         showLabel={false}
                                     />
                                 </div>
-
-                                {/* Name Input */}
-                                <div className="md:col-span-2">
+                                <div className="sm:col-span-2">
                                     <Input
                                         placeholder="Passenger Name"
+                                        aria-label={`Passenger name for ticket ${idx + 1}`}
                                         value={p.name}
                                         onChange={(e) => updatePassenger(h.id, { ...p, name: e.target.value })}
                                         disabled={isSelf}
-                                        className={cn(
-                                            "h-11 bg-white transition-all",
-                                            isSelf && "bg-slate-50 text-slate-500 cursor-not-allowed"
-                                        )}
+                                        className={cn('h-12 rounded-xl bg-card', isSelf && 'bg-background text-[#4A4766] cursor-not-allowed')}
                                     />
                                 </div>
                             </div>
-                        </div>
+                        </section>
                     );
                 })}
             </div>
 
-            {/* Footer Actions */}
-            <div className="fixed bottom-16 left-0 right-0 p-4 bg-white/80 backdrop-blur-xl border-t border-slate-200 z-30 md:static md:bg-transparent md:border-0 md:p-0 mt-8 pb-[calc(1rem+env(safe-area-inset-bottom,20px))]">
-                <div className="max-w-2xl mx-auto flex gap-4">
-                    <Button
-                        variant="ghost"
-                        className="flex-1 h-14 rounded-2xl font-bold text-slate-500 uppercase tracking-widest hover:bg-slate-100"
+            {/* Footer actions */}
+            <div className="fixed bottom-[68px] left-0 right-0 p-4 bg-card/95 backdrop-blur-xl border-t border-line z-30 md:static md:bg-transparent md:border-0 md:p-0 md:mt-2">
+                <div className="max-w-2xl mx-auto flex gap-3">
+                    <button
+                        type="button"
+                        className="flex-1 h-14 rounded-[18px] border-[1.5px] border-input bg-card text-ink text-[15px] font-extrabold focus-visible:outline-2 focus-visible:outline-iris"
                         onClick={() => navigate('/transport')}
                     >
                         Cancel
-                    </Button>
-                    <Button
-                        className="flex-[2] h-14 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all duration-300"
+                    </button>
+                    <button
+                        type="button"
+                        className="flex-[2] h-14 rounded-[18px] bg-ink text-white text-[15px] font-extrabold disabled:bg-secondary disabled:text-[#6E6B88] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
                         onClick={() => setShowConfirmModal(true)}
                         disabled={!isValid || activeHolds.length === 0}
                     >
-                        Review & Confirm
-                    </Button>
+                        Review &amp; Confirm
+                    </button>
                 </div>
             </div>
 
@@ -255,20 +250,18 @@ export const PassengerDetailsPage = () => {
                 onUpdatePassenger={(holdId, data) => updatePassenger(holdId, data)}
                 isStudent={isStudent}
             />
-            {
-                blocker.state === 'blocked' && (
-                    <AbandonBookingModal
-                        isOpen={true}
-                        timeLeft={timeLeft}
-                        onClose={() => blocker.reset?.()}
-                        onAbandon={() => {
-                            releaseAllHolds().then(() => blocker.proceed?.());
-                        }}
-                        onStay={() => blocker.reset?.()}
-                    />
-                )
-            }
-        </div >
+            {blocker.state === 'blocked' && (
+                <AbandonBookingModal
+                    isOpen={true}
+                    timeLeft={timeLeft}
+                    onClose={() => blocker.reset?.()}
+                    onAbandon={() => {
+                        releaseAllHolds().then(() => blocker.proceed?.());
+                    }}
+                    onStay={() => blocker.reset?.()}
+                />
+            )}
+        </div>
     );
 };
 

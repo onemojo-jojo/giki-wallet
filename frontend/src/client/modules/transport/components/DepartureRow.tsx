@@ -71,7 +71,9 @@ export const DepartureRow = ({ trip, isHeld, now, onBook, expanded, children }: 
                 <button
                     type="button"
                     onClick={() => onBook(trip)}
+                    id={`fare-${trip.id}`}
                     aria-expanded={expanded ? true : false}
+                    aria-controls={`picker-${trip.id}`}
                     aria-label={`Book ${city}, ${time} ${ampm}, Rs ${formatRs(trip.base_price)}`}
                     className={cn(
                         'h-11 px-4 rounded-[14px] text-sm font-extrabold shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris',
@@ -94,7 +96,7 @@ export const DepartureRow = ({ trip, isHeld, now, onBook, expanded, children }: 
                 </span>
             )}
             </div>
-            {expanded && open && !isHeld && children}
+            {expanded && open && !isHeld && <div id={`picker-${trip.id}`}>{children}</div>}
         </li>
     );
 };

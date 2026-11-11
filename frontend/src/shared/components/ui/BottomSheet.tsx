@@ -18,13 +18,23 @@ interface BottomSheetProps {
 export const BottomSheet = ({ open, title, subtitle, onClose, busy, children }: BottomSheetProps) => {
     const ref = useRef<HTMLElement>(null);
     const titleId = useId();
+    // Latest callbacks in refs, so parents re-rendering (e.g. a 1s timer) don't re-run the effect and steal focus.
+    const onCloseRef = useRef(onClose);
+    const busyRef = useRef(busy);
+    useEffect(() => {
+        onCloseRef.current = onClose;
+        busyRef.current = busy;
+    });
 
     useEffect(() => {
         if (!open) return;
         const previous = document.activeElement as HTMLElement | null;
-        ref.current?.querySelector<HTMLElement>('button:not([disabled]), a[href], input, select')?.focus();
+        ref.current?.querySelector<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled])')?.focus();
+        const html = document.documentElement;
+        const prevOverflow = html.style.overflow;
+        html.style.overflow = 'hidden';
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape' && !busy) onClose();
+            if (e.key === 'Escape' && !busyRef.current) onCloseRef.current();
             if (e.key === 'Tab' && ref.current) {
                 const items = [...ref.current.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled])')];
                 if (!items.length) return;
@@ -45,9 +55,10 @@ export const BottomSheet = ({ open, title, subtitle, onClose, busy, children }: 
         window.addEventListener('keydown', onKey);
         return () => {
             window.removeEventListener('keydown', onKey);
+            html.style.overflow = prevOverflow;
             previous?.focus?.();
         };
-    }, [open, busy, onClose]);
+    }, [open]);
 
     if (!open) return null;
 

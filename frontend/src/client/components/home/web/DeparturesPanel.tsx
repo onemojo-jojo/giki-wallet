@@ -18,12 +18,14 @@ const rowState = (t: Trip) => {
 
 /** Web home departures table (v2-Web): next day with buses, either direction. Book opens Rides with that bus's stop picker. */
 export const DeparturesPanel = () => {
-    const { allTrips, initialized, fetchData } = useTransportStore();
+    const { allTrips, activeHolds, initialized, fetchData } = useTransportStore();
+    const heldIds = useMemo(() => new Set(activeHolds.map((h) => h.trip_id)), [activeHolds]);
     const [dir, setDir] = useState<Dir>('OUTBOUND');
     const [now] = useState(() => Date.now());
 
+    // Load once; Rides refreshes the same store itself (avoids racing its fetch after a hold).
     useEffect(() => {
-        void fetchData(!initialized);
+        if (!initialized) void fetchData(true);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -112,7 +114,14 @@ export const DeparturesPanel = () => {
                                         <td className="px-2.5 py-3.5 text-[#4A4766]">{riderStops(t).map((s) => s.stop_name).join(', ')}</td>
                                         <td className={cn('px-2.5 py-3.5 font-bold whitespace-nowrap', seatClass)}>{seats}</td>
                                         <td className="px-2.5 py-3.5 text-right">
-                                            {state === 'open' ? (
+                                            {heldIds.has(t.id) ? (
+                                                <Link
+                                                    to="/transport"
+                                                    className="inline-flex items-center h-[38px] px-3.5 rounded-xl bg-mint-tint text-mint text-[13px] font-extrabold whitespace-nowrap focus-visible:outline-2 focus-visible:outline-iris"
+                                                >
+                                                    Held · continue
+                                                </Link>
+                                            ) : state === 'open' ? (
                                                 <Link
                                                     to="/transport"
                                                     state={{ openTripId: t.id, direction: dir, day }}

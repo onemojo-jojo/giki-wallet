@@ -63,7 +63,10 @@ export const TransportPage = () => {
     }, [fetchData]);
 
     useEffect(() => {
-        if (handoff?.direction && handoff.direction !== useTransportStore.getState().direction) setDirection(handoff.direction);
+        if (!handoff) return;
+        if (handoff.direction && handoff.direction !== useTransportStore.getState().direction) setDirection(handoff.direction);
+        // Use it once: Back / reload must not re-open the picker or force the direction again.
+        navigate(location.pathname, { replace: true, state: null });
         // Only on arrival.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -234,7 +237,11 @@ export const TransportPage = () => {
                 quotaRemaining={dirQuota?.remaining ?? null}
                 busy={holding}
                 onHold={handleHold}
-                onCancel={() => setOpenTripId(null)}
+                onCancel={() => {
+                    setOpenTripId(null);
+                    // The picker held focus; give it back to that bus's fare button.
+                    window.setTimeout(() => document.getElementById(`fare-${t.id}`)?.focus(), 0);
+                }}
             />
         </DepartureRow>
     );
@@ -244,9 +251,7 @@ export const TransportPage = () => {
             isOpen={true}
             timeLeft={timeLeft}
             onClose={() => blocker.reset?.()}
-            onAbandon={() => {
-                releaseAllHolds().then(() => blocker.proceed?.());
-            }}
+            onAbandon={() => releaseAllHolds().then(() => blocker.proceed?.())}
             onStay={() => blocker.reset?.()}
         />
     );
@@ -332,10 +337,7 @@ export const TransportPage = () => {
                     isOpen={confirmRelease}
                     timeLeft={timeLeft}
                     onClose={() => setConfirmRelease(false)}
-                    onAbandon={() => {
-                        setConfirmRelease(false);
-                        void releaseAllHolds();
-                    }}
+                    onAbandon={() => releaseAllHolds().then(() => setConfirmRelease(false))}
                     onStay={() => setConfirmRelease(false)}
                 />
             </div>

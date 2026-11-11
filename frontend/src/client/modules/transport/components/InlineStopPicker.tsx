@@ -47,7 +47,8 @@ export const InlineStopPicker = ({ trip, isStudent, quotaRemaining, busy, onHold
     });
     const [count, setCount] = useState(1);
     const maxTickets = Math.max(1, Math.min(3, trip.available_seats, quotaRemaining ?? 3));
-    const seats = isStudent ? 1 : count;
+    // Re-clamp if seats or quota drop while the picker is open.
+    const seats = isStudent ? 1 : Math.min(count, maxTickets);
 
     return (
         <div className="mt-3 pt-3 border-t border-[#F0EFF5] flex flex-col gap-3">
@@ -83,20 +84,20 @@ export const InlineStopPicker = ({ trip, isStudent, quotaRemaining, busy, onHold
                     <div className="flex items-center gap-3" role="group" aria-labelledby={`seats-${trip.id}`}>
                         <button
                             type="button"
-                            onClick={() => setCount((c) => Math.max(1, c - 1))}
-                            disabled={count <= 1}
+                            onClick={() => setCount(Math.max(1, seats - 1))}
+                            disabled={seats <= 1}
                             aria-label="One fewer seat"
                             className="size-11 rounded-xl bg-card text-ink font-extrabold text-xl disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-iris"
                         >
                             −
                         </button>
                         <span className="font-display text-2xl font-extrabold text-ink min-w-[2ch] text-center" aria-live="polite">
-                            {count}
+                            {seats}
                         </span>
                         <button
                             type="button"
-                            onClick={() => setCount((c) => Math.min(maxTickets, c + 1))}
-                            disabled={count >= maxTickets}
+                            onClick={() => setCount(Math.min(maxTickets, seats + 1))}
+                            disabled={seats >= maxTickets}
                             aria-label="One more seat"
                             className="size-11 rounded-xl bg-card text-ink font-extrabold text-xl disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-iris"
                         >

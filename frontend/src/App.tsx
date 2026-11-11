@@ -39,11 +39,16 @@ import BookedPage from '@/client/modules/transport/pages/BookedPage';
 
 // Shared components
 import { AccountPage } from '@/shared/modules/auth/pages/AccountPage';
-import { SignInPage } from '@/shared/modules/auth/pages/SignInPage';
-import { SignUpPage } from '@/shared/modules/auth/pages/SignUpPage';
-import { VerifyEmailPage } from '@/shared/modules/auth/pages/VerifyEmailPage';
-import { ForgotPasswordPage } from '@/shared/modules/auth/pages/ForgotPasswordPage';
-import { ResetPasswordPage } from '@/shared/modules/auth/pages/ResetPasswordPage';
+// Admin sign-in keeps its original page and layout.
+import { SignInPage as AdminSignInPage } from '@/shared/modules/auth/pages/SignInPage';
+
+// Student / staff auth (v2 designs)
+import WelcomePage from '@/client/modules/auth/pages/WelcomePage';
+import SignInPage from '@/client/modules/auth/pages/SignInPage';
+import SignUpPage from '@/client/modules/auth/pages/SignUpPage';
+import VerifyEmailPage from '@/client/modules/auth/pages/VerifyEmailPage';
+import ForgotPasswordPage from '@/client/modules/auth/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/client/modules/auth/pages/ResetPasswordPage';
 
 const LoadingSpinner = () => (
     <div className="min-h-[100vh] flex flex-col items-center justify-center bg-gray-50">
@@ -53,67 +58,19 @@ const LoadingSpinner = () => (
 );
 
 const router = createBrowserRouter([
-    {
-        path: '/auth/sign-in',
-        element: (
-            <AuthLayout>
-                <SignInPage />
-            </AuthLayout>
-        ),
-    },
-    {
-        path: '/auth/sign-up',
-        element: (
-            <AuthLayout>
-                <SignUpPage />
-            </AuthLayout>
-        ),
-    },
-    {
-        path: '/auth/verify',
-        element: (
-            <AuthLayout>
-                <VerifyEmailPage />
-            </AuthLayout>
-        ),
-    },
-    {
-        path: '/auth/forgot-password',
-        element: (
-            <AuthLayout>
-                <ForgotPasswordPage />
-            </AuthLayout>
-        ),
-    },
-    {
-        path: '/auth/reset-password',
-        element: (
-            <AuthLayout>
-                <ResetPasswordPage />
-            </AuthLayout>
-        ),
-    },
-    {
-        path: '/reset-password',
-        element: (
-            <AuthLayout>
-                <ResetPasswordPage />
-            </AuthLayout>
-        ),
-    },
-    {
-        path: '/verify',
-        element: (
-            <AuthLayout>
-                <VerifyEmailPage />
-            </AuthLayout>
-        ),
-    },
+    { path: '/auth/welcome', element: <WelcomePage /> },
+    { path: '/auth/sign-in', element: <SignInPage /> },
+    { path: '/auth/sign-up', element: <SignUpPage /> },
+    { path: '/auth/verify', element: <VerifyEmailPage /> },
+    { path: '/auth/forgot-password', element: <ForgotPasswordPage /> },
+    { path: '/auth/reset-password', element: <ResetPasswordPage /> },
+    { path: '/reset-password', element: <ResetPasswordPage /> },
+    { path: '/verify', element: <VerifyEmailPage /> },
     {
         path: '/admin/signin',
         element: (
             <AuthLayout>
-                <SignInPage />
+                <AdminSignInPage />
             </AuthLayout>
         ),
     },

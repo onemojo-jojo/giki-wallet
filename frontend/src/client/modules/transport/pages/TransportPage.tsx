@@ -18,7 +18,7 @@ import type { BookingSelection, Trip } from '../validators';
 import { formatInTimeZone } from 'date-fns-tz';
 
 /** Routes inside the booking flow that keep seats held (no "abandon?" prompt). */
-const BOOKING_FLOW = ['/transport/review', '/transport/passengers', '/transport/booked', '/tickets'];
+const BOOKING_FLOW = ['/transport/review', '/transport/passengers', '/transport/booked'];
 
 export const TransportPage = () => {
     const navigate = useNavigate();
@@ -150,7 +150,13 @@ export const TransportPage = () => {
             .map((k) => ({ key: k, date: new Date(`${k}T12:00:00+05:00`), hasTrips: withTrips.has(k) }));
     }, [dirTrips, now]);
 
-    const firstDayWithTrips = days.find((d) => d.hasTrips)?.key ?? days[0]?.key ?? '';
+    // Round trip with one leg held: the other leg's view. Default its day to on/after the held bus.
+    const heldLeg = summarizeLeg(outboundSelection ?? returnSelection, allTrips);
+    const pickingSecondLeg = isRoundTrip && !!heldLeg && !(outboundSelection && returnSelection);
+    const todayKey = dayKey(new Date(now));
+    const minDay = pickingSecondLeg && heldLeg?.direction === 'OUTBOUND' && heldLeg.departure ? dayKey(heldLeg.departure) : todayKey;
+    const firstDayWithTrips =
+        days.find((d) => d.hasTrips && d.key >= minDay)?.key ?? days.find((d) => d.hasTrips)?.key ?? days[0]?.key ?? '';
     const selectedDay = pickedDay && days.some((d) => d.key === pickedDay) ? pickedDay : firstDayWithTrips;
     const dayTrips = dirTrips.filter((t) => dayKey(t.departure_time) === selectedDay);
 
@@ -228,8 +234,6 @@ export const TransportPage = () => {
     );
 
     // ---------- Round trip: one leg held, pick the other ----------
-    const heldLeg = summarizeLeg(outboundSelection ?? returnSelection, allTrips);
-    const pickingSecondLeg = isRoundTrip && !!heldLeg && !(outboundSelection && returnSelection);
 
     if (pickingSecondLeg && heldLeg) {
         const wantsReturn = heldLeg.direction === 'OUTBOUND';
@@ -295,6 +299,17 @@ export const TransportPage = () => {
                     </span>
                     <span className="font-display text-lg font-extrabold text-ink tabular shrink-0">Rs {formatRs(heldLeg.seats * heldLeg.priceEach)}</span>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        // Same as switching Round trip off on the old screen: keep the held leg, pay for it alone.
+                        setRoundTrip(false);
+                        goToPayment();
+                    }}
+                    className="self-center h-11 px-4 rounded-xl text-sm font-extrabold text-iris-strong focus-visible:outline-2 focus-visible:outline-iris"
+                >
+                    Book one way instead
+                </button>
 
                 {sheet}
                 {abandon}
@@ -321,7 +336,8 @@ export const TransportPage = () => {
                     message={`${activeHolds.length} seat${activeHolds.length === 1 ? '' : 's'} held for you`}
                     actions={[
                         { label: 'Release All', onClick: () => void releaseAllHolds() },
-                        ...(useTransportStore.getState().canProceed() ? [{ label: 'Continue', onClick: goToPayment, primary: true }] : []),
+                        // Held seats can always be paid for (even after a reload wipes the in-memory selection).
+                        { label: 'Continue', onClick: goToPayment, primary: true },
                     ]}
                 />
             )}

@@ -8,9 +8,11 @@ import { useTransportStore } from '../store';
 import { useHoldTimer } from '../hooks';
 import { HoldTimerBar } from '../components/HoldTimerBar';
 import { AbandonBookingModal } from '../components/AbandonBookingModal';
-import { cityCode, formatRs, summarizeLeg, TZ, type LegSummary } from '../bookingHelpers';
+import { toast } from 'sonner';
+import { cityCode, formatRs, legsFromHolds, TZ, type LegSummary } from '../bookingHelpers';
 
-const BOOKING_FLOW = ['/transport', '/tickets'];
+// Screens that keep held seats without an 'abandon?' prompt. Add money is allowed so a short balance can be topped up.
+const BOOKING_FLOW = ['/transport', '/top-up', '/payment'];
 
 const LegCard = ({ leg, tag }: { leg: LegSummary; tag: string }) => {
     const from = leg.direction === 'OUTBOUND' ? 'GIKI' : cityCode(leg.city);
@@ -19,7 +21,7 @@ const LegCard = ({ leg, tag }: { leg: LegSummary; tag: string }) => {
         <section aria-label={tag} className="bg-card rounded-[22px] p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-extrabold tracking-[0.06em] text-iris-strong">{tag}</span>
-                <span className="text-[13px] font-bold text-muted-foreground">{formatInTimeZone(new Date(leg.departure), TZ, 'EEE d MMM · h:mm a')}</span>
+                <span className="text-[13px] font-bold text-muted-foreground">{leg.departure ? formatInTimeZone(new Date(leg.departure), TZ, 'EEE d MMM · h:mm a') : '—'}</span>
             </div>
             <div className="flex items-center gap-2.5" aria-label={`${leg.routeName}`}>
                 <span className="font-display text-[26px] font-extrabold tracking-tight text-ink">{from}</span>
@@ -64,11 +66,22 @@ export const ReviewPage = () => {
             !BOOKING_FLOW.some((p) => nextLocation.pathname.startsWith(p))
     );
 
-    const legs = useMemo(
-        () => [summarizeLeg(outboundSelection, allTrips), summarizeLeg(returnSelection, allTrips)].filter((l): l is LegSummary => !!l),
-        [outboundSelection, returnSelection, allTrips]
+    // Built from the seats actually held (what Pay charges for), not just the last selection.
+    const { legs, total, complete } = useMemo(
+        () => legsFromHolds(activeHolds, allTrips, [outboundSelection, returnSelection]),
+        [activeHolds, allTrips, outboundSelection, returnSelection]
     );
-    const total = legs.reduce((sum, l) => sum + l.seats * l.priceEach, 0);
+
+    // A hold ran out while on this screen → tell the user and start over.
+    useEffect(() => {
+        if (paying || activeHolds.length === 0 || timeLeft > 0) return;
+        if (activeHolds.some((h) => new Date(h.expires_at).getTime() < Date.now())) {
+            toast.error('Reservation expired. Please try again.');
+            useTransportStore.getState().resetBookingFlow();
+            void fetchData(false);
+            navigate('/transport', { replace: true });
+        }
+    }, [timeLeft, activeHolds, paying, fetchData, navigate]);
     const after = balance - total;
     const short = total > 0 && after < 0;
 
@@ -136,7 +149,7 @@ export const ReviewPage = () => {
                 <button
                     type="button"
                     onClick={() => void pay()}
-                    disabled={paying}
+                    disabled={paying || !complete || total <= 0}
                     className="h-[58px] rounded-[18px] bg-ink text-white text-base font-extrabold flex items-center justify-between px-[22px] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
                 >
                     <span>{paying ? 'Paying…' : 'Pay with G-Bux'}</span>

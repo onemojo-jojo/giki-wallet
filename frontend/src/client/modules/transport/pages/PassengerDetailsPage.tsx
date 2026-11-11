@@ -9,10 +9,12 @@ import { useTransportStore } from '../store';
 import { useHoldTimer } from '../hooks';
 import { HoldTimerBar } from '../components/HoldTimerBar';
 import { AbandonBookingModal } from '../components/AbandonBookingModal';
-import { formatRs, summarizeLeg, TZ, type LegSummary } from '../bookingHelpers';
+import { toast } from 'sonner';
+import { formatRs, legsFromHolds, TZ } from '../bookingHelpers';
 import type { Passenger } from '../validators';
 
-const BOOKING_FLOW = ['/transport', '/tickets'];
+// Screens that keep held seats without an 'abandon?' prompt. Add money is allowed so a short balance can be topped up.
+const BOOKING_FLOW = ['/transport', '/top-up', '/payment'];
 
 const RELATIONS: { value: Passenger['relation']; label: string }[] = [
     { value: 'SELF', label: 'Myself' },
@@ -57,14 +59,25 @@ export const PassengerDetailsPage = () => {
         return p && p.name && (p.relation === 'SELF' || !!p.relation);
     });
 
-    const legs = useMemo(
-        () => [summarizeLeg(outboundSelection, allTrips), summarizeLeg(returnSelection, allTrips)].filter((l): l is LegSummary => !!l),
-        [outboundSelection, returnSelection, allTrips]
+    // Built from the seats actually held (what Pay charges for), not just the last selection.
+    const { legs, total, complete } = useMemo(
+        () => legsFromHolds(activeHolds, allTrips, [outboundSelection, returnSelection]),
+        [activeHolds, allTrips, outboundSelection, returnSelection]
     );
-    const total = legs.reduce((sum, l) => sum + l.seats * l.priceEach, 0);
+
+    // A hold ran out while on this screen → tell the user and start over.
+    useEffect(() => {
+        if (paying || activeHolds.length === 0 || timeLeft > 0) return;
+        if (activeHolds.some((h) => new Date(h.expires_at).getTime() < Date.now())) {
+            toast.error('Reservation expired. Please try again.');
+            useTransportStore.getState().resetBookingFlow();
+            void fetchData(false);
+            navigate('/transport', { replace: true });
+        }
+    }, [timeLeft, activeHolds, paying, fetchData, navigate]);
     const short = total > 0 && balance - total < 0;
     const tripLine = legs
-        .map((l) => `${formatInTimeZone(new Date(l.departure), TZ, 'EEE d MMM · h:mm a')} · ${l.routeName}`)
+        .map((l) => `${l.departure ? formatInTimeZone(new Date(l.departure), TZ, 'EEE d MMM · h:mm a') + ' · ' : ''}${l.routeName}`)
         .join('  +  ');
 
     const pay = async () => {
@@ -201,7 +214,7 @@ export const PassengerDetailsPage = () => {
                 <button
                     type="button"
                     onClick={() => void pay()}
-                    disabled={!isValid || paying}
+                    disabled={!isValid || paying || !complete || total <= 0}
                     className="w-full h-[58px] rounded-[18px] bg-ink text-white text-base font-extrabold flex items-center justify-between px-[22px] disabled:bg-secondary disabled:text-[#6E6B88] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
                 >
                     <span>

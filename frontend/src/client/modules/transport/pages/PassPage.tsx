@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LogoMark } from '@/shared/components/ui/Logo';
+import { TalariaMark } from '@/shared/components/ui/Logo';
 import { useTransportStore } from '../store';
 import { formatRs } from '../bookingHelpers';
 import { PILL_CLASS, fmt, isCancelledStatus, isUpcoming, passengerLabel, splitTickets, ticketEnds, ticketPill } from '../ticketHelpers';
@@ -154,7 +154,7 @@ export const PassPage = () => {
                     <div className="bg-ink text-white px-5 py-4 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <span className="flex items-center gap-2 text-xs font-extrabold tracking-[0.08em] text-ink-muted">
-                                <LogoMark size={20} tone="volt" />
+                                <TalariaMark size={20} />
                                 {busLabel}
                             </span>
                             <span className={cn('text-xs font-extrabold px-2.5 py-1 rounded-full', pill.tone === 'paid' ? 'bg-volt text-ink' : PILL_CLASS[pill.tone])}>{pill.label}</span>

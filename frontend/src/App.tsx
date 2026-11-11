@@ -54,7 +54,7 @@ import ResetPasswordPage from '@/client/modules/auth/pages/ResetPasswordPage';
 const LoadingSpinner = () => (
     <div className="min-h-[100vh] flex flex-col items-center justify-center bg-gray-50">
         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-gray-500 font-medium animate-pulse">Loading GIKI Wallet...</p>
+        <p className="text-gray-500 font-medium animate-pulse">Loading Talaria…</p>
     </div>
 );
 

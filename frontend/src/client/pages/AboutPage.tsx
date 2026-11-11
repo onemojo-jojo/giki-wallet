@@ -41,7 +41,7 @@ const AboutPage = () => {
                     <span className="text-primary tracking-normal font-medium">by GIKIans.</span>
                 </h1>
                 <p className="text-lg text-gray-600 max-w-2xl leading-relaxed">
-                    GIKI Wallet started as a simple idea: how can we make daily campus life better? Today, it's a tool that serves the student community, making every transaction and booking effortless.
+                    Talaria started as a simple idea: how can we make daily campus life better? Today, it's a tool that serves the student community, making every transaction and booking effortless.
                 </p>
             </div>
 
@@ -62,7 +62,7 @@ const AboutPage = () => {
                     </div>
                     <h3 className="text-xl font-semibold text-gray-900">Start Building</h3>
                     <p className="text-gray-600 leading-relaxed">
-                        Don't wait for a grand opportunity. Look at the small frictions in your daily life on campus and build a solution. GIKI Wallet is proof that one student's initiative can become a campus standard.
+                        Don't wait for a grand opportunity. Look at the small frictions in your daily life on campus and build a solution. Talaria is proof that one student's initiative can become a campus standard.
                     </p>
                 </div>
             </div>
@@ -83,7 +83,7 @@ const AboutPage = () => {
                             <p className="text-primary font-medium">President Microsoft Club GIKI</p>
                         </div>
                         <p className="text-gray-600 max-w-md">
-                            Passionate about building software that actually helps people. GIKI Wallet is my contribution to making our campus life smarter and more connected.
+                            Passionate about building software that actually helps people. Talaria is my contribution to making our campus life smarter and more connected.
                         </p>
 
                         {/* Simple Social Links */}

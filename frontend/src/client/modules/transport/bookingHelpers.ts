@@ -160,7 +160,7 @@ export const downloadCalendar = (legs: LegSummary[]) => {
             `DTEND:${icsDate(end)}`,
             `SUMMARY:${icsText(`Bus ${from} → ${to}`)}`,
             `LOCATION:${icsText(where)}`,
-            `DESCRIPTION:${icsText(`${l.seats} seat(s). Show your ride pass in GIKI Wallet when boarding.`)}`,
+            `DESCRIPTION:${icsText(`${l.seats} seat(s). Show your ride pass in Talaria when boarding.`)}`,
             'BEGIN:VALARM',
             'TRIGGER:-PT30M',
             'ACTION:DISPLAY',
@@ -171,7 +171,7 @@ export const downloadCalendar = (legs: LegSummary[]) => {
             .map(icsFold)
             .join('\r\n');
     });
-    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GIKI Wallet//Rides//EN', ...events, 'END:VCALENDAR'].join('\r\n');
+    const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Talaria//Rides//EN', ...events, 'END:VCALENDAR'].join('\r\n');
     const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;

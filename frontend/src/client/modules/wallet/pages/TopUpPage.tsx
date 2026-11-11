@@ -223,7 +223,7 @@ const TopUpPage = () => {
                 <div className="mt-auto flex flex-col gap-3">
                     <p className="flex items-center justify-center gap-1.5 text-xs text-[#4A4766]">
                         <Lock className="size-3.5 text-mint" aria-hidden="true" />
-                        No fees. GIKI Wallet never sees your PIN or card.
+                        No fees. Talaria never sees your PIN or card.
                     </p>
                     <button
                         type="button"

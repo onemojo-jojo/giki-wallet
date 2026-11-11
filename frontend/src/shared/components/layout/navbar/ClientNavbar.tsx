@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LogoMark } from '@/shared/components/ui/Logo';
+import { TalariaMark } from '@/shared/components/ui/Logo';
 import { useAuthStore } from '@/shared/stores/authStore';
 import { getInitials } from '@/lib/initials';
 import { MAIN_TABS, isTabActive } from '@/client/navigation';
@@ -30,8 +30,8 @@ export const ClientNavbar = ({ onSignInClick, onSignUpClick, isAuthenticated }: 
         <header className="sticky top-0 z-50 w-full bg-card border-b border-line">
             <div className="max-w-[1200px] mx-auto px-6 py-3.5 flex flex-wrap items-center gap-x-7 gap-y-4">
                 <Link to="/" className="flex items-center gap-2.5 rounded-xl text-ink focus-visible:outline-2 focus-visible:outline-iris">
-                    <LogoMark size={36} />
-                    <span className="font-display font-extrabold text-xl tracking-[-0.02em]">GIKI Wallet</span>
+                    <TalariaMark size={36} />
+                    <span className="font-display font-extrabold text-xl tracking-[-0.02em]">Talaria</span>
                 </Link>
 
                 <nav aria-label="Main" className="flex-1 flex flex-wrap gap-1">

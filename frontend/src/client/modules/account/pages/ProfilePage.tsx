@@ -139,7 +139,7 @@ export const ProfilePage = () => {
                 title="APP"
                 rows={[
                     { label: 'Send feedback', onClick: feedback.openFeedback },
-                    { label: 'About GIKI Wallet', to: '/about' },
+                    { label: 'About Talaria', to: '/about' },
                 ]}
             />
 

@@ -50,7 +50,7 @@ export const CAMPUS_SERVICES: CampusService[] = [
 ];
 
 export const ABOUT_LINK = {
-    name: 'About GIKI Wallet',
+    name: 'About Talaria',
     description: 'Who builds it and why',
     icon: Info,
     to: '/about',

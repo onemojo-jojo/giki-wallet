@@ -7,7 +7,28 @@ interface LogoMarkProps {
     className?: string;
 }
 
-/** The v2 brand mark: a "G" drawn as a bus loop that ends at a stop. */
+interface TalariaMarkProps {
+    size?: number;
+    /** `volt`: Volt tile with Midnight wing (default, works on light and dark). `dark`: Midnight tile with a Volt wing. */
+    tone?: 'volt' | 'dark';
+    className?: string;
+}
+
+/** Talaria — Hermes' winged sandals: three feathers of a wing, joined at the root. The student app's mark. */
+export const TalariaMark = ({ size = 40, tone = 'volt', className }: TalariaMarkProps) => {
+    const tile = tone === 'dark' ? '#16133A' : '#C8F04A';
+    const wing = tone === 'dark' ? '#C8F04A' : '#16133A';
+    return (
+        <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" className={cn('shrink-0', className)}>
+            <rect width="48" height="48" rx="13" fill={tile} />
+            <path d="M12 33 C 20 33, 30 28, 36 14" fill="none" stroke={wing} strokeWidth="4" strokeLinecap="round" />
+            <path d="M17 33 C 24 32, 31 29, 37 22" fill="none" stroke={wing} strokeWidth="3.2" strokeLinecap="round" />
+            <path d="M22 34 C 28 33, 33 31, 37 28" fill="none" stroke={wing} strokeWidth="2.6" strokeLinecap="round" />
+        </svg>
+    );
+};
+
+/** The previous mark (a "G" drawn as a bus loop). Still used by the admin side. */
 export const LogoMark = ({ size = 40, tone = 'dark', className }: LogoMarkProps) => {
     const tile = tone === 'volt' ? '#C8F04A' : '#16133A';
     const stroke = tone === 'volt' ? '#16133A' : '#C8F04A';

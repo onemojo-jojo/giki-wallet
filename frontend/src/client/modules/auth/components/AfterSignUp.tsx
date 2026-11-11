@@ -32,7 +32,7 @@ export const CheckInbox = ({ email, onChangeEmail }: { email: string; onChangeEm
         <ol className="mt-2 list-decimal bg-background rounded-[18px] py-4 pr-4 pl-9 flex flex-col gap-2.5 text-sm text-[#4A4766]">
             <li>Open Outlook on your GIKI account.</li>
             <li>
-                Tap <strong className="text-ink">Verify my email</strong> in the message from GIKI Wallet.
+                Tap <strong className="text-ink">Verify my email</strong> in the message we sent you.
             </li>
             <li>The link signs you in. You can also sign in here once you've verified.</li>
         </ol>

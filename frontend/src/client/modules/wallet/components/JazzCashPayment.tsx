@@ -44,7 +44,7 @@ const formatClock = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s
  */
 const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, onFailure, maxLimit, currentBalance, onBack, onUseCard, autoStart }) => {
     const isPhone = useIsPhone();
-    const { formData, setMobileNumber, setCnicLastSix, balance, txnRefNo } = useWalletModuleStore();
+    const { formData, setMobileNumber, setCnicLastSix, renewIdempotencyKey, balance, txnRefNo } = useWalletModuleStore();
     const phoneNumber = formData.mobile_number;
     const cnicLast6 = formData.cnic_last_six;
     const [focus, setFocus] = useState<'mobile' | 'cnic'>('mobile');
@@ -209,7 +209,11 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
                 <div className="flex flex-col gap-2.5">
                     <button
                         type="button"
-                        onClick={reset}
+                        onClick={() => {
+                            // A new attempt needs a new idempotency key; the old one maps to the failed payment.
+                            renewIdempotencyKey();
+                            reset();
+                        }}
                         className="h-14 rounded-[18px] bg-primary text-primary-foreground text-base font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
                     >
                         Try again

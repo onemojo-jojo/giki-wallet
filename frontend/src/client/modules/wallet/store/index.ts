@@ -47,6 +47,8 @@ interface TopUpFormState {
     setMobileNumber: (mobile: string) => void;
     setCnicLastSix: (cnic: string) => void;
     setMethod: (method: 'MWALLET' | 'CARD') => void;
+    /** New idempotency key for a fresh attempt (e.g. "Try again" after a failure). */
+    renewIdempotencyKey: () => void;
     resetFormData: () => void;
 }
 
@@ -153,6 +155,10 @@ export const useWalletModuleStore = create<WalletModuleStore>((set, get) => ({
             // Regenerate idempotency key when payment method changes
             idempotency_key: generateIdempotencyKey(),
         }
+    })),
+
+    renewIdempotencyKey: () => set((state) => ({
+        formData: { ...state.formData, idempotency_key: generateIdempotencyKey() },
     })),
 
     resetFormData: () => set({

@@ -39,7 +39,7 @@ import ReviewPage from '@/client/modules/transport/pages/ReviewPage';
 import BookedPage from '@/client/modules/transport/pages/BookedPage';
 
 // Shared components
-import { AccountPage } from '@/shared/modules/auth/pages/AccountPage';
+import ProfilePage from '@/client/modules/account/pages/ProfilePage';
 // Admin sign-in keeps its original page and layout.
 import { SignInPage as AdminSignInPage } from '@/shared/modules/auth/pages/SignInPage';
 
@@ -207,7 +207,7 @@ const router = createBrowserRouter([
         children: [
             {
                 index: true,
-                element: <AccountPage />,
+                element: <ProfilePage />,
             },
         ],
     },

@@ -3,6 +3,7 @@ import { MessageSquarePlus } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ClientNavbar, Footer } from '@/shared/components/layout';
 import { BottomNav } from '@/shared/components/layout/BottomNav';
+import { OfflineBanner } from '@/client/components/OfflineBanner';
 import { FeedbackModal } from '@/client/modules/feedback/components/FeedbackModal';
 import { useFeedback } from '@/client/modules/feedback/hooks/useFeedback';
 import { Button } from '@/shared/components/ui/button';
@@ -72,6 +73,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                 {/* No mobile top bar: each screen starts with its own title (v2 design); Home has the avatar. */}
 
                 <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full px-4 lg:px-6 py-4 md:py-12">
+                    <OfflineBanner />
                     {children}
                 </main>
 

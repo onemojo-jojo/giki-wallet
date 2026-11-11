@@ -1,76 +1,79 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/*
+ * GIKI Wallet v2 design tokens
+ * Midnight (ink) · Iris (actions) · Volt (highlight on dark)
+ * Amber is reserved for anything time-limited (holds, approvals, "opens in").
+ */
 :root {
-    /* Deep Midnight Blue (#0F172A - Slate 900-ish but richer) */
-    --primary: hsl(222 47% 11%);
-    --primary-foreground: hsl(210 40% 98%);
+    /* Iris — buttons, links, selected states */
+    --primary: #5B3DF5;
+    --primary-foreground: #FFFFFF;
 
-    --background: hsl(210 40% 98%);
-    /* Slightly off-white */
-    --foreground: hsl(222.2 84% 4.9%);
+    /* Cloud — app background */
+    --background: #F5F5F8;
+    --foreground: #16133A;
 
-    --card: hsl(0 0% 100%);
-    --card-foreground: hsl(222.2 84% 4.9%);
+    --card: #FFFFFF;
+    --card-foreground: #16133A;
 
-    --popover: hsl(0 0% 100%);
-    --popover-foreground: hsl(222.2 84% 4.9%);
+    --popover: #FFFFFF;
+    --popover-foreground: #16133A;
 
-    --secondary: hsl(210 40% 96.1%);
-    --secondary-foreground: hsl(222.2 47.4% 11.2%);
+    --secondary: #ECEBF2;
+    --secondary-foreground: #16133A;
 
-    --muted: hsl(210 40% 96.1%);
-    --muted-foreground: hsl(215.4 16.3% 46.9%);
+    --muted: #ECEBF2;
+    --muted-foreground: #5E5B78;
 
-    /* Vibrant Teal for Accent */
-    --accent: hsl(173 58% 39%);
-    --accent-foreground: hsl(0 0% 100%);
+    /* Mint — money in, open, success */
+    --accent: #0E7A55;
+    --accent-foreground: #FFFFFF;
 
-    --destructive: hsl(0 84.2% 60.2%);
-    --destructive-foreground: hsl(210 40% 98%);
+    /* Coral — real problems only */
+    --destructive: #C0262D;
+    --destructive-foreground: #FFFFFF;
 
-    --border: hsl(214.3 31.8% 91.4%);
-    --input: hsl(214.3 31.8% 91.4%);
-    --ring: hsl(222 47% 11%);
+    --border: #E6E5EE;
+    --input: #D9D7E5;
+    --ring: #5B3DF5;
 
     --radius: 1rem;
-    /* More rounded default */
 }
 
 .dark {
-    --background: hsl(222.2 84% 4.9%);
-    --foreground: hsl(210 40% 98%);
+    --background: #16133A;
+    --foreground: #FFFFFF;
 
-    --card: hsl(222.2 84% 4.9%);
-    --card-foreground: hsl(210 40% 98%);
+    --card: #241F5C;
+    --card-foreground: #FFFFFF;
 
-    --popover: hsl(222.2 84% 4.9%);
-    --popover-foreground: hsl(210 40% 98%);
+    --popover: #241F5C;
+    --popover-foreground: #FFFFFF;
 
-    --primary: hsl(210 40% 98%);
-    --primary-foreground: hsl(222.2 47.4% 11.2%);
+    --primary: #C8F04A;
+    --primary-foreground: #16133A;
 
-    --secondary: hsl(217.2 32.6% 17.5%);
-    --secondary-foreground: hsl(210 40% 98%);
+    --secondary: #2E2870;
+    --secondary-foreground: #FFFFFF;
 
-    --muted: hsl(217.2 32.6% 17.5%);
-    --muted-foreground: hsl(215 20.2% 65.1%);
+    --muted: #2E2870;
+    --muted-foreground: #B7B3D9;
 
-    --accent: hsl(217.2 32.6% 17.5%);
-    --accent-foreground: hsl(210 40% 98%);
+    --accent: #C8F04A;
+    --accent-foreground: #16133A;
 
-    --destructive: hsl(0 62.8% 30.6%);
-    --destructive-foreground: hsl(210 40% 98%);
+    --destructive: #FF8A8F;
+    --destructive-foreground: #16133A;
 
-    --border: hsl(217.2 32.6% 17.5%);
-    --input: hsl(217.2 32.6% 17.5%);
-    --ring: hsl(212.7 26.8% 83.9%);
+    --border: #2E2870;
+    --input: #3A3478;
+    --ring: #C8F04A;
 }
 
-/* --- 2. YOUR CUSTOM COLORS --- */
 @theme {
-    /* These map the CSS variables above to Tailwind classes */
-
+    /* shadcn-style semantic tokens */
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
 
@@ -99,19 +102,42 @@
     --color-input: var(--input);
     --color-ring: var(--ring);
 
-    /* Your Static Custom Colors (from Django) */
-    --color-light-background: #F8FAFC;
-    /* Slightly cooler gray */
-    --color-dark-text: #0F172A;
-    --color-light-text: #ffffff;
-    --color-border-gray: #E2E8F0;
-    --color-light-gray: #94A3B8;
+    /* v2 brand palette */
+    --color-ink: #16133A;
+    --color-ink-2: #241F5C;
+    --color-ink-3: #2E2870;
+    --color-ink-muted: #B7B3D9;
+    --color-iris: #5B3DF5;
+    --color-iris-strong: #3A22B8;
+    --color-iris-tint: #EEEBFF;
+    --color-volt: #C8F04A;
+    --color-cloud: #F5F5F8;
+    --color-line: #E6E5EE;
+    --color-mint: #0E7A55;
+    --color-mint-tint: #E3F5EC;
+    --color-signal: #E07B00;
+    --color-signal-text: #8A4B00;
+    --color-signal-tint: #FFF1D6;
+    --color-coral: #C0262D;
+    --color-coral-tint: #FDECEC;
+
+    /* Legacy names kept so existing screens keep working during the revamp */
+    --color-light-background: #F5F5F8;
+    --color-dark-text: #16133A;
+    --color-light-text: #FFFFFF;
+    --color-border-gray: #E6E5EE;
+    --color-light-gray: #8C89A6;
+    --color-primary-dark: #3A22B8;
+    --color-accent-light: #2DB37F;
+    --color-footer-bg: #16133A;
 
     /* --- FONTS --- */
-    --font-inter: "Inter",
-        sans-serif;
-    --font-dmsans: "DM Sans",
-        sans-serif;
+    --font-display: "Bricolage Grotesque", "Manrope", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    /* Legacy aliases — both now render the v2 body font */
+    --font-inter: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    --font-dmsans: "Manrope", ui-sans-serif, system-ui, sans-serif;
 
     /* --- RADIUS --- */
     --radius-sm: calc(var(--radius) - 4px);
@@ -120,28 +146,23 @@
     --radius-xl: calc(var(--radius) + 4px);
     --radius-2xl: calc(var(--radius) + 8px);
     --radius-3xl: calc(var(--radius) + 12px);
-
-    /* Semantic Colors */
-    --color-primary-dark: hsl(222 47% 8%);
-    /* Darker than primary */
-    --color-accent-light: hsl(173 58% 50%);
-    /* Lighter accent for text */
-    --color-footer-bg: hsl(240 4% 9%);
-    /* Zinc 900 equivalent */
 }
 
-/* --- 3. UTILITIES --- */
 @utility text-shadow-ts {
     text-shadow: 0px 4px 4px #0000003f;
 }
 
-/* --- 4. BASE RESETS --- */
+/* Amounts and codes line up in columns */
+@utility tabular {
+    font-variant-numeric: tabular-nums;
+}
+
 @layer base {
     * {
         @apply border-border outline-ring/50;
     }
 
     body {
-        @apply bg-background text-foreground font-inter;
+        @apply bg-background text-foreground font-body antialiased;
     }
 }

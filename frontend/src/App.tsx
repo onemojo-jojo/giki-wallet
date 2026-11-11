@@ -38,7 +38,7 @@ import ReviewPage from '@/client/modules/transport/pages/ReviewPage';
 import BookedPage from '@/client/modules/transport/pages/BookedPage';
 
 // Shared components
-import { AccountPage } from '@/shared/modules/auth/pages/AccountPage';
+import ProfilePage from '@/client/modules/account/pages/ProfilePage';
 import { SignInPage } from '@/shared/modules/auth/pages/SignInPage';
 import { SignUpPage } from '@/shared/modules/auth/pages/SignUpPage';
 import { VerifyEmailPage } from '@/shared/modules/auth/pages/VerifyEmailPage';
@@ -241,7 +241,7 @@ const router = createBrowserRouter([
         children: [
             {
                 index: true,
-                element: <AccountPage />,
+                element: <ProfilePage />,
             },
         ],
     },

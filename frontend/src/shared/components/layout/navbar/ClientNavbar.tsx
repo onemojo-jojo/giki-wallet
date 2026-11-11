@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User } from 'lucide-react';
 import { Logo } from '@/shared/components/ui/Logo';
 import { Button } from '@/shared/components/ui/button';
@@ -10,6 +10,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
+import { MAIN_TABS, isTabActive } from '@/client/navigation';
+import { cn } from '@/lib/utils';
 
 interface ClientNavbarProps {
     onMyBookingsClick?: () => void;
@@ -20,6 +22,9 @@ interface ClientNavbarProps {
     isAuthenticated: boolean;
 }
 
+/** Desktop label for the centre "Pass" tab. */
+const desktopLabel = (key: string, label: string) => (key === 'pass' ? 'My Tickets' : label);
+
 export const ClientNavbar = ({
     onMyBookingsClick,
     onMyAccountClick,
@@ -29,93 +34,97 @@ export const ClientNavbar = ({
     isAuthenticated,
 }: ClientNavbarProps) => {
     const navigate = useNavigate();
+    const { pathname } = useLocation();
+
+    const links = [
+        // About has its own desktop link, so it should not also light up Campus here.
+        ...MAIN_TABS.map((t) => ({
+            key: t.key,
+            label: desktopLabel(t.key, t.label),
+            to: t.to,
+            active: pathname !== '/about' && isTabActive(t, pathname),
+        })),
+        { key: 'about', label: 'About', to: '/about', active: pathname === '/about' },
+    ];
 
     return (
-        <nav className="sticky top-0 z-50 w-full border-b border-gray-200/50 bg-white/80 backdrop-blur-xl transition-all shadow-sm">
-            <div className="max-w-5xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
-                {/* Logo */}
-                <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-2.5 group focus:outline-none"
-                    aria-label="Go to home"
+        <nav className="sticky top-0 z-50 w-full border-b border-line bg-card/90 backdrop-blur-xl">
+            <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center gap-6">
+                <Link
+                    to="/"
+                    className="flex items-center group rounded-xl focus-visible:outline-2 focus-visible:outline-iris"
+                    aria-label="GIKI Wallet home"
                 >
                     <Logo />
-                </button>
+                </Link>
 
-                {/* Actions */}
-                <div className="flex items-center gap-3">
-                    <div className="hidden md:flex items-center gap-1 mr-2">
-                        <Button
-                            variant="ghost"
-                            className="text-gray-600 hover:text-gray-900 hover:bg-gray-100/50 rounded-full h-9 px-4 text-sm font-medium"
-                            onClick={() => navigate('/about')}
+                <div className="flex-1 flex items-center gap-1 overflow-x-auto py-1.5 px-0.5">
+                    {links.map((l) => (
+                        <Link
+                            key={l.key}
+                            to={l.to}
+                            aria-current={l.active ? 'page' : undefined}
+                            className={cn(
+                                'h-10 px-3.5 rounded-xl text-sm whitespace-nowrap flex items-center transition-colors',
+                                'focus-visible:outline-2 focus-visible:outline-iris',
+                                l.active
+                                    ? 'bg-secondary text-ink font-extrabold'
+                                    : 'text-[#4A4766] font-semibold hover:bg-secondary/60 hover:text-ink'
+                            )}
                         >
-                            About
-                        </Button>
-                    </div>
-                    {isAuthenticated ? (
-                        <>
-                            <div className="hidden md:flex items-center gap-2 mr-2">
-                                <Button
-                                    variant="ghost"
-                                    className="text-gray-600 hover:text-gray-900 hover:bg-gray-100/50 rounded-full h-9 px-4 text-sm font-medium"
-                                    onClick={onMyBookingsClick}
-                                >
-                                    My Tickets
-                                </Button>
-                            </div>
+                            {l.label}
+                        </Link>
+                    ))}
+                </div>
 
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-10 w-10 rounded-full bg-gray-100/50 text-gray-700 hover:bg-gray-100 border border-gray-200/50 shadow-sm transition-all"
-                                    >
-                                        <User className="w-5 h-5" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56 mt-2 rounded-2xl p-2 border-gray-200 shadow-xl bg-white/95 backdrop-blur-sm">
-                                    <DropdownMenuLabel className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        Account
-                                    </DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={onMyAccountClick} className="rounded-lg cursor-pointer font-medium text-gray-700 hover:bg-gray-50">
-                                        Profile settings
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={onMyBookingsClick} className="rounded-lg md:hidden cursor-pointer font-medium text-gray-700 hover:bg-gray-50">
-                                        My Tickets
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => navigate('/about')} className="rounded-lg md:hidden cursor-pointer font-medium text-gray-700 hover:bg-gray-50">
-                                        About Us
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator className="my-1 bg-gray-100" />
-                                    <DropdownMenuItem
-                                        onClick={onLogoutClick}
-                                        className="text-red-600 focus:text-red-700 focus:bg-red-50 rounded-lg cursor-pointer font-medium"
-                                    >
-                                        Sign out
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </>
-                    ) : (
-                        <div className="flex items-center gap-2">
+                {isAuthenticated ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
                             <Button
                                 variant="ghost"
-                                className="hidden sm:flex text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full font-medium"
-                                onClick={onSignInClick}
+                                size="icon"
+                                aria-label="Account menu"
+                                className="size-10 rounded-xl bg-iris text-white hover:bg-iris-strong hover:text-white"
                             >
-                                Sign in
+                                <User className="size-5" />
                             </Button>
-                            <Button
-                                className="bg-primary text-white hover:bg-primary/90 rounded-full font-semibold shadow-md shadow-primary/20 border-0"
-                                onClick={onSignUpClick}
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 mt-2 rounded-2xl p-2 border-line shadow-xl bg-card">
+                            <DropdownMenuLabel className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                                Account
+                            </DropdownMenuLabel>
+                            <DropdownMenuItem onClick={onMyAccountClick} className="rounded-lg cursor-pointer font-semibold text-ink">
+                                Profile settings
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onMyBookingsClick} className="rounded-lg md:hidden cursor-pointer font-semibold text-ink">
+                                My Tickets
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate('/about')} className="rounded-lg md:hidden cursor-pointer font-semibold text-ink">
+                                About Us
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="my-1 bg-line" />
+                            <DropdownMenuItem
+                                onClick={onLogoutClick}
+                                className="text-coral focus:text-coral focus:bg-coral-tint rounded-lg cursor-pointer font-semibold"
                             >
-                                Sign up
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                                Sign out
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            className="rounded-xl font-bold text-ink"
+                            onClick={onSignInClick}
+                        >
+                            Sign in
+                        </Button>
+                        <Button className="rounded-xl font-extrabold bg-primary text-primary-foreground hover:bg-iris-strong" onClick={onSignUpClick}>
+                            Sign up
+                        </Button>
+                    </div>
+                )}
             </div>
         </nav>
     );

@@ -16,9 +16,6 @@ const maskPhone = (p?: string | null) => {
     return d.length >= 7 ? `${d.slice(0, 4)} ••• ${d.slice(-4)}` : p || 'Not provided';
 };
 
-/** "2023418" → "2023-418"-style display used on the ID card ("2023-0418" in the design). */
-const formatRegNo = (reg: string) => (/^\d{5,}$/.test(reg) ? `${reg.slice(0, 4)}-${reg.slice(4)}` : reg);
-
 const ROLE_LABEL: Record<string, string> = { STUDENT: 'STUDENT ID', EMPLOYEE: 'STAFF ID' };
 
 type Row = { label: string; value?: ReactNode; to?: string; onClick?: () => void };
@@ -109,7 +106,7 @@ export const ProfilePage = () => {
                     <div className="flex-1 min-w-0 flex flex-col gap-1.5">
                         <span className="text-[11px] font-extrabold tracking-[0.1em] text-ink-muted">GIKI · {ROLE_LABEL[user.user_type] ?? user.user_type.replace(/_/g, ' ')}</span>
                         <span className="font-display text-[22px] font-extrabold tracking-[-0.02em] leading-[1.05] break-words">{user.name}</span>
-                        {regId && <span className="font-mono text-sm font-semibold text-volt">{formatRegNo(regId)}</span>}
+                        {regId && <span className="font-mono text-sm font-semibold text-volt">{regId}</span>}
                         <span className="text-xs text-[#D9D6F2] break-all">{user.email}</span>
                     </div>
                 </div>

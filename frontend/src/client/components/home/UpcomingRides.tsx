@@ -66,8 +66,9 @@ export const UpcomingRides = () => {
         const role = user?.user_type?.toUpperCase();
         return trips
             .filter((t) => {
-                if (role === 'STUDENT' && t.bus_type !== 'STUDENT') return false;
-                if (role === 'EMPLOYEE' && t.bus_type !== 'EMPLOYEE') return false;
+                const busType = t.bus_type?.toUpperCase();
+                if (role === 'STUDENT' && busType !== 'STUDENT') return false;
+                if (role === 'EMPLOYEE' && busType !== 'EMPLOYEE') return false;
                 return t.status === 'SCHEDULED' && new Date(t.booking_opens_at).getTime() > now;
             })
             .sort((a, b) => new Date(a.booking_opens_at).getTime() - new Date(b.booking_opens_at).getTime())[0];
@@ -130,12 +131,14 @@ export const UpcomingRides = () => {
                     <DateChip iso={nextOpening.departure_time} tone="signal" />
                     <span className="flex-1 min-w-0 flex flex-col gap-0.5">
                         <span className="text-[15px] font-extrabold text-[#4A2800] truncate">
-                            Seats open {formatTime12(nextOpening.booking_opens_at)}
+                            Seats open {formatInTimeZone(new Date(nextOpening.booking_opens_at), TZ, 'EEE')}{' '}
+                            {formatTime12(nextOpening.booking_opens_at)}
                         </span>
                         <span className="text-[13px] text-[#6B3A00] truncate">
                             In <span className="font-mono font-semibold">{countdown(new Date(nextOpening.booking_opens_at).getTime(), now)}</span>
                             {' · '}
-                            {nextOpening.route_name}
+                            {nextOpening.route_name}, {formatInTimeZone(new Date(nextOpening.departure_time), TZ, 'EEE')}{' '}
+                            {formatTime12(nextOpening.departure_time)}
                         </span>
                     </span>
                     <BellRing className="size-5 text-signal-text shrink-0" aria-hidden="true" />

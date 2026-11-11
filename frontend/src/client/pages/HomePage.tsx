@@ -25,10 +25,10 @@ const SignedOutHero = () => (
             Top up G-Bux, grab a seat on the weekend bus and show your pass — all from one app.
         </p>
         <div className="flex flex-wrap gap-2.5">
-            <Link to="/auth/sign-up" className="h-12 px-5 rounded-2xl bg-volt text-ink font-extrabold text-[15px] flex items-center">
+            <Link to="/auth/sign-up" className="h-12 px-5 rounded-2xl bg-volt text-ink font-extrabold text-[15px] flex items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-volt">
                 Create account
             </Link>
-            <Link to="/auth/sign-in" className="h-12 px-5 rounded-2xl border border-ink-3 text-white font-bold text-[15px] flex items-center hover:bg-ink-2">
+            <Link to="/auth/sign-in" className="h-12 px-5 rounded-2xl border border-ink-3 text-white font-bold text-[15px] flex items-center hover:bg-ink-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-volt">
                 Sign in
             </Link>
         </div>
@@ -43,9 +43,14 @@ export const HomePage = () => {
         <div className="max-w-3xl mx-auto w-full flex flex-col gap-6 pt-1">
             {user ? (
                 <>
-                    <p className="text-sm text-muted-foreground -mb-3">
-                        {greeting()}, <span className="font-extrabold text-ink">{firstName}</span>
-                    </p>
+                    <h1 className="text-sm font-normal text-muted-foreground -mb-3">
+                        {greeting()}
+                        {firstName ? (
+                            <>
+                                , <span className="font-extrabold text-ink">{firstName}</span>
+                            </>
+                        ) : null}
+                    </h1>
                     <BalanceHero />
                     <ServiceTiles />
                     <UpcomingRides />

@@ -61,7 +61,8 @@ interface TransportState {
     updateDraft: (direction: 'OUTBOUND' | 'INBOUND', draft: Partial<BookingDraft>) => void;
     confirmBooking: (confirmations: Array<{ holdId: string; passengerName: string; passengerRelation: string }>) => Promise<void>;
     fetchUserTickets: () => Promise<void>;
-    cancelTicket: (ticketId: string) => Promise<void>;
+    /** Resolves true when the ticket was cancelled (errors are shown as toasts). */
+    cancelTicket: (ticketId: string) => Promise<boolean>;
     canProceed: () => boolean;
 }
 
@@ -399,10 +400,10 @@ export const useTransportStore = create<TransportState>((set, get) => ({
         set({ loading: true });
         try {
             await cancelTicket(ticketId);
-            await get().fetchUserTickets();
-            await get().fetchData(false); // Update quota/seats if necessary
-            toast.success('Ticket cancelled successfully');
         } catch (e) {
+            // Refresh either way so is_cancellable / status reflect the server.
+            void get().fetchUserTickets();
+            set({ loading: false });
             if (e instanceof AppError) {
                 if (e.statusCode === 400) {
 
@@ -410,16 +411,25 @@ export const useTransportStore = create<TransportState>((set, get) => ({
                         toast.error("Too late to cancel!", {
                             description: "The bus is departing soon or booking window has closed."
                         });
-                        return;
+                        return false;
                     }
                 }
                 logError(e, { action: 'cancelTicket', ticketId });
             }
             const msg = getErrorMessage(e);
             toast.error(msg);
+            return false;
+        }
+        toast.success('Ticket cancelled successfully');
+        try {
+            await get().fetchUserTickets();
+            await get().fetchData(false); // Update quota/seats if necessary
+        } catch {
+            /* the cancel itself succeeded; a failed refresh shouldn't report an error */
         } finally {
             set({ loading: false });
         }
+        return true;
     },
 
     canProceed: () => {

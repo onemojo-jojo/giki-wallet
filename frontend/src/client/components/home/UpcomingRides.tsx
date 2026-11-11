@@ -6,6 +6,7 @@ import { useTransportStore } from '@/client/modules/transport/store';
 import { getWeeklySummary } from '@/client/modules/transport/api';
 import type { MyTicket, Trip } from '@/client/modules/transport/validators';
 import { useAuthStore } from '@/shared/stores/authStore';
+import { isUpcoming } from '@/client/modules/transport/ticketHelpers';
 
 const TZ = 'Asia/Karachi';
 const formatTime12 = (iso: string) => formatInTimeZone(new Date(iso), TZ, 'h:mm a');
@@ -54,9 +55,8 @@ export const UpcomingRides = () => {
 
     // Same rule as the Tickets page: hide cancelled and anything that left more than 3h ago.
     const upcoming = useMemo(() => {
-        const cutoff = now - 3 * 60 * 60 * 1000;
         return myTickets
-            .filter((t: MyTicket) => t.status !== 'CANCELLED' && new Date(t.departure_time).getTime() >= cutoff)
+            .filter((t: MyTicket) => isUpcoming(t, now))
             .sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
             .slice(0, 2);
     }, [myTickets, now]);
@@ -80,7 +80,7 @@ export const UpcomingRides = () => {
                 <h2 id="home-upcoming" className="font-display font-bold text-xl text-ink">
                     Your rides
                 </h2>
-                <Link to="/tickets" className="text-[13px] font-extrabold text-iris-strong hover:underline">
+                <Link to="/tickets/all" className="text-[13px] font-extrabold text-iris-strong hover:underline">
                     All tickets
                 </Link>
             </div>
@@ -88,7 +88,7 @@ export const UpcomingRides = () => {
             {upcoming.map((t) => (
                 <Link
                     key={t.ticket_id}
-                    to="/tickets"
+                    to={`/tickets/${t.ticket_id}`}
                     className="flex items-center gap-3.5 bg-card rounded-[20px] p-3.5 hover:shadow-md transition-shadow focus-visible:outline-2 focus-visible:outline-iris"
                 >
                     <DateChip iso={t.departure_time} tone="iris" />

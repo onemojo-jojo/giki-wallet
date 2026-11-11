@@ -27,7 +27,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
 
 
     const handleMyTicketsClick = () => {
-        navigate('/tickets');
+        navigate('/tickets/all');
     };
 
     const handleMyAccountClick = () => {

@@ -139,7 +139,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
 
                 {/* Floating Feedback Trigger */}
                 {!!user && (
-                    <div className="fixed bottom-[104px] right-4 md:bottom-8 md:right-8 z-50">
+                    <div className="fixed bottom-[104px] right-4 md:bottom-8 md:right-8 z-40">
                         <Button
                             onClick={openFeedback}
                             className="rounded-full shadow-lg h-12 w-12 p-0 bg-primary hover:bg-primary/90 text-white"

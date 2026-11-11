@@ -14,6 +14,9 @@ interface WalletState {
     transactions: ApiTransaction[];
     isDataLoading: boolean;
     dataError: string | null;
+    /** History has its own flags so a fast balance call can't end its loading state early. */
+    isHistoryLoading: boolean;
+    historyError: string | null;
 
     // Actions
     fetchBalance: () => Promise<void>;
@@ -62,6 +65,8 @@ export const useWalletModuleStore = create<WalletModuleStore>((set, get) => ({
     transactions: [],
     isDataLoading: false,
     dataError: null,
+    isHistoryLoading: false,
+    historyError: null,
 
     // Initial Payment State
     status: 'idle',
@@ -90,12 +95,12 @@ export const useWalletModuleStore = create<WalletModuleStore>((set, get) => ({
     },
 
     fetchHistory: async () => {
-        set({ isDataLoading: true, dataError: null });
+        set({ isHistoryLoading: true, historyError: null });
         try {
             const data = await getHistory();
-            set({ transactions: data, isDataLoading: false });
+            set({ transactions: data, isHistoryLoading: false });
         } catch (error: any) {
-            set({ dataError: error.message || 'Failed to fetch history', isDataLoading: false });
+            set({ historyError: error.message || 'Failed to fetch history', isHistoryLoading: false });
         }
     },
 

@@ -1,5 +1,8 @@
 import { Ticket, Wallet, ArrowRightLeft, RotateCcw, Bus } from 'lucide-react';
 import { ReactNode } from 'react';
+import { formatInTimeZone } from 'date-fns-tz';
+import type { ApiTransaction } from '../api';
+import { formatTime } from './walletHelpers';
 
 export type TransactionType = 'ticket' | 'topup' | 'transfer' | 'received' | 'refund';
 
@@ -9,37 +12,58 @@ export interface Transaction {
     description: string;
     amount: number;
     timestamp: string;
-    date: string; // Format: YYYY-MM-DD
+    date: string; // Format: YYYY-MM-DD (Asia/Karachi calendar day)
     referenceId?: string;
+    balanceAfter?: number;
+    createdAt?: string; // original ISO timestamp
 }
+
+const TIMEZONE = 'Asia/Karachi';
+
+/** Absolute amount for display, e.g. 1,250 or 99.5. */
+export const formatAmount = (n: number) => Math.abs(n).toLocaleString('en-PK', { maximumFractionDigits: 2 });
+
+/** Map an API transaction to the UI model. Groups by the Karachi calendar day, not the UTC day. */
+export const toTransaction = (t: ApiTransaction): Transaction => ({
+    id: t.id,
+    type: mapTxType(t.type),
+    description: t.description,
+    amount: t.amount,
+    timestamp: formatTime(t.created_at),
+    date: formatInTimeZone(new Date(t.created_at), TIMEZONE, 'yyyy-MM-dd'),
+    referenceId: t.reference_id,
+    balanceAfter: t.balance_after,
+    createdAt: t.created_at,
+});
 
 export const getTransactionIcon = (type: TransactionType): ReactNode => {
     switch (type) {
         case 'ticket':
-            return <Bus className="w-5 h-5 text-primary" />;
+            return <Bus className="w-5 h-5" aria-hidden="true" />;
         case 'topup':
-            return <Wallet className="w-5 h-5 text-accent" />;
+            return <Wallet className="w-5 h-5" aria-hidden="true" />;
         case 'transfer':
-            return <ArrowRightLeft className="w-5 h-5 text-primary" />;
+            return <ArrowRightLeft className="w-5 h-5" aria-hidden="true" />;
         case 'received':
-            return <ArrowRightLeft className="w-5 h-5 text-green-600 flip-x" />; // Reuse and flip for received
+            return <ArrowRightLeft className="w-5 h-5 -scale-x-100" aria-hidden="true" />;
         case 'refund':
-            return <RotateCcw className="w-5 h-5 text-orange-500" />;
+            return <RotateCcw className="w-5 h-5" aria-hidden="true" />;
+        default:
+            return <Ticket className="w-5 h-5" aria-hidden="true" />;
     }
 };
 
+/** Icon tile colours: money in = mint, money out = iris. */
 export const getIconBackground = (type: TransactionType): string => {
     switch (type) {
-        case 'ticket':
-            return "bg-primary/10";
         case 'topup':
-            return "bg-accent/10";
-        case 'transfer':
-            return "bg-primary/10";
         case 'received':
-            return "bg-green-100";
         case 'refund':
-            return "bg-orange-50";
+            return 'bg-mint-tint text-mint';
+        case 'ticket':
+        case 'transfer':
+        default:
+            return 'bg-iris-tint text-iris-strong';
     }
 };
 
@@ -68,5 +92,18 @@ export const getTransactionTitle = (transaction: Transaction): string => {
             return 'Refund Received';
         default:
             return transaction.description;
+    }
+};
+
+/** Filter buckets used by the Wallet screen. */
+export type TransactionFilter = 'all' | 'rides' | 'topups' | 'refunds' | 'transfers';
+
+export const matchesFilter = (t: Transaction, filter: TransactionFilter) => {
+    switch (filter) {
+        case 'rides': return t.type === 'ticket';
+        case 'topups': return t.type === 'topup';
+        case 'refunds': return t.type === 'refund';
+        case 'transfers': return t.type === 'transfer' || t.type === 'received';
+        default: return true;
     }
 };

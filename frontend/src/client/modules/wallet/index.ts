@@ -1,2 +1,2 @@
-export { WalletPage } from './pages/WalletPage';
+export { WalletTabPage } from './pages/WalletTabPage';
 export type { WalletTransaction, WalletBalance } from './types';

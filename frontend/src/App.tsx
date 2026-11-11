@@ -33,6 +33,8 @@ import BookingConfirmationPage from '@/client/modules/transport/pages/BookingCon
 import { WalletTabPage } from '@/client/modules/wallet/pages/WalletTabPage';
 import { CampusPage } from '@/client/modules/campus/pages/CampusPage';
 import PassengerDetailsPage from '@/client/modules/transport/pages/PassengerDetailsPage';
+import ReviewPage from '@/client/modules/transport/pages/ReviewPage';
+import BookedPage from '@/client/modules/transport/pages/BookedPage';
 
 // Shared components
 import { AccountPage } from '@/shared/modules/auth/pages/AccountPage';
@@ -171,6 +173,14 @@ const router = createBrowserRouter([
             {
                 path: 'passengers',
                 element: <PassengerDetailsPage />,
+            },
+            {
+                path: 'review',
+                element: <ReviewPage />,
+            },
+            {
+                path: 'booked',
+                element: <BookedPage />,
             },
         ],
     },

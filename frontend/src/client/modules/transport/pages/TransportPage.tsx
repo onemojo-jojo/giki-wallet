@@ -1,18 +1,24 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useBlocker } from 'react-router-dom';
+import { ArrowLeftRight, Check, ChevronLeft } from 'lucide-react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/shared/components/ui/switch';
 import { useAuthStore } from '@/shared/stores/authStore';
 import { useTransportStore } from '../store';
 import { useHoldTimer } from '../hooks';
-import { TransportBookingModeSelector } from '../components/TransportBookingModeSelector';
-import { PendingReservationBanner } from '../components/PendingReservationBanner';
 import { AbandonBookingModal } from '../components/AbandonBookingModal';
-import { RouteGrid } from '../components/RouteGrid'; // NEW TILE-BASED UI
-import { BookingConfirmationModal, TripSummary } from '../components/BookingConfirmationModal';
-import { SelectionSummary } from '../components/SelectionSummary';
-import { formatDate, formatTime } from '../utils';
-import type { BookingSelection } from '../validators';
-import { toast } from 'sonner';
+import { DayStrip, type Day } from '../components/DayStrip';
+import { DepartureRow } from '../components/DepartureRow';
+import { StopSheet } from '../components/StopSheet';
+import { HoldTimerBar } from '../components/HoldTimerBar';
+import { getGIKIStopObject } from '../utils';
+import { dayKey, formatClock, formatRs, summarizeLeg, TZ } from '../bookingHelpers';
+import type { BookingSelection, Trip } from '../validators';
+import { formatInTimeZone } from 'date-fns-tz';
+
+/** Routes inside the booking flow that keep seats held (no "abandon?" prompt). */
+const BOOKING_FLOW = ['/transport/review', '/transport/passengers', '/transport/booked', '/tickets'];
 
 export const TransportPage = () => {
     const navigate = useNavigate();
@@ -20,9 +26,6 @@ export const TransportPage = () => {
     const {
         allTrips,
         activeHolds,
-        passengers,
-        updatePassenger,
-        confirmBooking,
         loading: tripsLoading,
         initialized,
         fetchData,
@@ -34,35 +37,41 @@ export const TransportPage = () => {
         returnSelection,
         isRoundTrip,
         setRoundTrip,
+        quota,
     } = useTransportStore();
 
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [confirming, setConfirming] = useState(false);
     const timeLeft = useHoldTimer(activeHolds);
+    const [sheetTrip, setSheetTrip] = useState<Trip | null>(null);
+    const [holding, setHolding] = useState(false);
+    const [pickedDay, setPickedDay] = useState<string | null>(null);
+    const [confirmRelease, setConfirmRelease] = useState(false);
+    const [now, setNow] = useState(() => Date.now());
 
     const blocker = useBlocker(
         ({ currentLocation, nextLocation }) =>
             activeHolds.length > 0 &&
             currentLocation.pathname !== nextLocation.pathname &&
-            !nextLocation.pathname.includes('/transport/passengers') &&
-            // After a confirmed booking we go to My Tickets; never ask to "abandon" there.
-            nextLocation.pathname !== '/tickets'
+            !BOOKING_FLOW.some((p) => nextLocation.pathname.startsWith(p))
     );
 
     useEffect(() => {
         void fetchData(true);
     }, [fetchData]);
 
+    // Live "opens in" text.
+    useEffect(() => {
+        const t = window.setInterval(() => setNow(Date.now()), 30000);
+        return () => window.clearInterval(t);
+    }, []);
+
     useEffect(() => {
         // Only show expiration if timer has actually counted down (add 1s grace period)
         // This prevents false "expired" on initial hold creation when timeLeft starts at 0
         if (activeHolds.length > 0 && timeLeft === 0 && !tripsLoading && initialized) {
-            // Double-check holds are actually expired by checking the timestamp
-            const now = Date.now();
-            const hasExpiredHold = activeHolds.some(h => new Date(h.expires_at).getTime() < now);
-            
+            const nowMs = Date.now();
+            const hasExpiredHold = activeHolds.some((h) => new Date(h.expires_at).getTime() < nowMs);
             if (hasExpiredHold) {
-                toast.error("Reservation expired. Please try again.");
+                toast.error('Reservation expired. Please try again.');
                 fetchData(false);
                 useTransportStore.getState().resetBookingFlow();
             }
@@ -70,12 +79,11 @@ export const TransportPage = () => {
     }, [activeHolds.length, timeLeft, tripsLoading, fetchData, initialized, activeHolds]);
 
     const nextBookingOpening = useMemo(() => {
-        const now = Date.now();
+        const nowMs = Date.now();
         return allTrips.reduce<number | null>((soonest, trip) => {
             if (trip.status !== 'SCHEDULED') return soonest;
-
             const opensAt = new Date(trip.booking_opens_at).getTime();
-            if (!Number.isFinite(opensAt) || opensAt <= now) return soonest;
+            if (!Number.isFinite(opensAt) || opensAt <= nowMs) return soonest;
             return soonest === null || opensAt < soonest ? opensAt : soonest;
         }, null);
     }, [allTrips]);
@@ -118,228 +126,282 @@ export const TransportPage = () => {
     }, [nextBookingOpening, tripsLoading, initialized, fetchData]);
 
     const isStudent = user?.user_type === 'STUDENT';
+    const heldTripIds = useMemo(() => new Set(activeHolds.map((h) => h.trip_id)), [activeHolds]);
+    const dirQuota = direction === 'OUTBOUND' ? quota?.outbound ?? null : quota?.inbound ?? null;
+    const canBookRoundTrip = quota ? quota.outbound.remaining >= 1 && quota.inbound.remaining >= 1 : true;
 
-    const handleBook = async (selection: BookingSelection) => {
+    // Trips for the current direction (same filter as before: not cancelled/deleted).
+    const dirTrips = useMemo(() => {
+        const target = direction.toUpperCase();
+        return allTrips
+            .filter((t) => t.direction.toUpperCase().trim() === target)
+            .filter((t) => !['CANCELLED', 'DELETED'].includes(t.status.toUpperCase().trim()))
+            .sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime());
+    }, [allTrips, direction]);
+
+    // Day chips: the next 7 days, plus any later day that has buses.
+    const days: Day[] = useMemo(() => {
+        const keys = new Set<string>();
+        for (let i = 0; i < 7; i++) keys.add(dayKey(new Date(now + i * 864e5)));
+        dirTrips.forEach((t) => keys.add(dayKey(t.departure_time)));
+        const withTrips = new Set(dirTrips.map((t) => dayKey(t.departure_time)));
+        return [...keys]
+            .sort()
+            .map((k) => ({ key: k, date: new Date(`${k}T12:00:00+05:00`), hasTrips: withTrips.has(k) }));
+    }, [dirTrips, now]);
+
+    const firstDayWithTrips = days.find((d) => d.hasTrips)?.key ?? days[0]?.key ?? '';
+    const selectedDay = pickedDay && days.some((d) => d.key === pickedDay) ? pickedDay : firstDayWithTrips;
+    const dayTrips = dirTrips.filter((t) => dayKey(t.departure_time) === selectedDay);
+
+    const handleHold = async (stopId: string, ticketCount: number) => {
+        const trip = sheetTrip;
+        if (!trip) return;
+        const gikiStop = getGIKIStopObject(trip.stops);
+        if (!gikiStop) {
+            toast.error('GIKI Stop not found');
+            return;
+        }
+        const tripDirection = trip.direction.toUpperCase() === 'OUTBOUND' ? 'OUTBOUND' : 'INBOUND';
+        const selection: BookingSelection = {
+            tripId: trip.id,
+            pickupId: tripDirection === 'OUTBOUND' ? gikiStop.stop_id : stopId,
+            dropoffId: tripDirection === 'OUTBOUND' ? stopId : gikiStop.stop_id,
+            ticketCount,
+        };
+
+        setHolding(true);
         try {
             await addSelection(selection);
-            const state = useTransportStore.getState();
-
-            if (state.isRoundTrip) {
-                if (state.outboundSelection && state.returnSelection) {
-                    if (isStudent) {
-                        setShowConfirmModal(true);
-                    } else {
-                        navigate('/transport/passengers');
-                    }
-                } else { }
-            } else {
-                if (isStudent) {
-                    setShowConfirmModal(true);
-                } else {
-                    navigate('/transport/passengers');
-                }
-            }
-
-        } catch (error) {
-            console.error('handleBook error:', error);
-        }
-    };
-
-    const handleConfirmBooking = async () => {
-        setConfirming(true);
-        try {
-            const confirmations = activeHolds.map(h => ({
-                holdId: h.id,
-                passengerName: passengers[h.id]?.name || user?.name || '',
-                passengerRelation: passengers[h.id]?.relation || 'SELF'
-            }));
-            await confirmBooking(confirmations);
-            setShowConfirmModal(false);
-            navigate('/tickets');
-        } catch (error) {
-            console.error('Failed to confirm booking:', error);
         } finally {
-            setConfirming(false);
+            setHolding(false);
         }
+
+        const state = useTransportStore.getState();
+        const held = state.outboundSelection?.tripId === trip.id || state.returnSelection?.tripId === trip.id;
+        if (!held) return; // store already showed the error
+        setSheetTrip(null);
+        setPickedDay(null);
+
+        const done = state.isRoundTrip ? !!(state.outboundSelection && state.returnSelection) : true;
+        if (done) navigate(isStudent ? '/transport/review' : '/transport/passengers');
     };
+
+    const goToPayment = () => navigate(isStudent ? '/transport/review' : '/transport/passengers');
 
     if (!initialized) {
         return (
-            <div className="max-w-5xl mx-auto w-full flex flex-col gap-3 pt-1" aria-busy="true" aria-label="Loading rides">
+            <div className="max-w-3xl mx-auto w-full flex flex-col gap-3 pt-1" aria-busy="true" aria-label="Loading rides">
                 <div className="h-8 w-32 rounded-lg bg-secondary" />
                 <div className="h-12 rounded-2xl bg-secondary" />
+                <div className="h-16 rounded-2xl bg-secondary" />
                 {[0, 1, 2].map((i) => (
-                    <div key={i} className="h-[76px] rounded-[22px] bg-card" />
+                    <div key={i} className="h-[76px] rounded-[20px] bg-card" />
                 ))}
             </div>
         );
     }
 
-    const getTripSummary = (selection: BookingSelection | null): TripSummary | null => {
-        if (!selection) return null;
-        const trip = allTrips.find(t => t.id === selection.tripId);
-        if (!trip) return null;
-
-        const pickup = trip.stops.find(s => s.stop_id === selection.pickupId)?.stop_name || 'Unknown';
-        const dropoff = trip.stops.find(s => s.stop_id === selection.dropoffId)?.stop_name || 'Unknown';
-
-        return {
-            route: trip.route_name,
-            when: `${formatDate(trip.departure_time)} • ${formatTime(trip.departure_time)}`,
-            pickup,
-            dropoff,
-            seats: selection.ticketCount,
-            priceEach: trip.base_price,
-        };
-    };
-
-    const outboundSummary = getTripSummary(outboundSelection);
-    const returnSummary = getTripSummary(returnSelection);
-
-    const outboundHolds = activeHolds
-        .filter(h => h.direction?.toUpperCase() === 'OUTBOUND')
-        .map(h => ({ hold_id: h.id, expires_at: h.expires_at }));
-
-    const returnHolds = activeHolds
-        .filter(h => h.direction?.toUpperCase() === 'INBOUND')
-        .map(h => ({ hold_id: h.id, expires_at: h.expires_at }));
-
-    const quota = useTransportStore.getState().quota;
-    const canContinue = useTransportStore.getState().canProceed();
-
-    const SectionTitle = ({ step, done, children }: { step?: string; done?: boolean; children: ReactNode }) => (
-        <div className="flex items-center gap-2.5 px-1">
-            {step && (
-                <span
-                    className={cn(
-                        'size-7 rounded-full flex items-center justify-center text-xs font-extrabold',
-                        done ? 'bg-mint text-white' : 'bg-secondary text-[#4A4766]'
-                    )}
-                    aria-hidden="true"
-                >
-                    {done ? '✓' : step}
-                </span>
-            )}
-            <h2 className="font-display text-xl font-extrabold text-ink">{children}</h2>
-        </div>
+    const sheet = (
+        <StopSheet
+            key={sheetTrip?.id ?? 'none'}
+            trip={sheetTrip}
+            direction={sheetTrip?.direction.toUpperCase() === 'INBOUND' ? 'INBOUND' : 'OUTBOUND'}
+            isStudent={isStudent}
+            quotaRemaining={dirQuota?.remaining ?? null}
+            busy={holding}
+            onClose={() => setSheetTrip(null)}
+            onHold={handleHold}
+        />
     );
 
+    const abandon = blocker.state === 'blocked' && (
+        <AbandonBookingModal
+            isOpen={true}
+            timeLeft={timeLeft}
+            onClose={() => blocker.reset?.()}
+            onAbandon={() => {
+                releaseAllHolds().then(() => blocker.proceed?.());
+            }}
+            onStay={() => blocker.reset?.()}
+        />
+    );
+
+    // ---------- Round trip: one leg held, pick the other ----------
+    const heldLeg = summarizeLeg(outboundSelection ?? returnSelection, allTrips);
+    const pickingSecondLeg = isRoundTrip && !!heldLeg && !(outboundSelection && returnSelection);
+
+    if (pickingSecondLeg && heldLeg) {
+        const wantsReturn = heldLeg.direction === 'OUTBOUND';
+        return (
+            <div className="max-w-3xl mx-auto w-full flex flex-col gap-3.5 pt-1 pb-44 md:pb-8">
+                <div className="flex items-center gap-3">
+                    <button
+                        type="button"
+                        onClick={() => setConfirmRelease(true)}
+                        aria-label="Back to rides"
+                        className="size-11 rounded-[14px] bg-card text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                    >
+                        <ChevronLeft className="size-[22px]" strokeWidth={2.2} />
+                    </button>
+                    <h1 className="flex-1 font-display font-extrabold text-xl text-ink">Round trip</h1>
+                    <span role="timer" aria-label={`${formatClock(timeLeft)} left on your held seat`} className="font-mono text-[13px] font-semibold text-signal-text bg-signal-tint px-2.5 py-1.5 rounded-[10px] tabular">
+                        {formatClock(timeLeft)}
+                    </span>
+                </div>
+
+                <ol className="bg-card rounded-[22px] overflow-hidden">
+                    <li className="flex items-center gap-3 px-4 py-3.5">
+                        <span className="size-[30px] rounded-full bg-mint text-white flex items-center justify-center shrink-0">
+                            <Check className="size-4" strokeWidth={3} aria-hidden="true" />
+                        </span>
+                        <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                            <span className="text-xs font-extrabold text-mint">{wantsReturn ? 'GOING' : 'COMING BACK'} · SEAT HELD</span>
+                            <span className="text-[15px] font-extrabold text-ink truncate">
+                                {formatInTimeZone(new Date(heldLeg.departure), TZ, 'EEE d · h:mm a')} · {heldLeg.routeName}
+                            </span>
+                        </span>
+                        <button type="button" onClick={() => setConfirmRelease(true)} className="h-11 px-1 text-[13px] font-extrabold text-iris-strong focus-visible:outline-2 focus-visible:outline-iris rounded-lg">
+                            Change
+                        </button>
+                    </li>
+                    <li className="flex items-center gap-3 px-4 py-3.5 bg-[#F6F4FF] border-t border-secondary">
+                        <span className="size-[30px] rounded-full bg-iris text-white flex items-center justify-center text-sm font-extrabold shrink-0">2</span>
+                        <span className="flex-1 flex flex-col gap-0.5">
+                            <span className="text-xs font-extrabold text-iris-strong">{wantsReturn ? 'COMING BACK' : 'GOING'}</span>
+                            <span className="text-[15px] font-extrabold text-ink">{wantsReturn ? 'Pick a return bus' : 'Pick the bus leaving GIKI'}</span>
+                        </span>
+                    </li>
+                </ol>
+
+                <DayStrip days={days} selected={selectedDay} onSelect={setPickedDay} label={wantsReturn ? 'Return day' : 'Departure day'} />
+
+                <h2 className="px-1 pt-1 text-xs font-extrabold tracking-[0.08em] uppercase text-muted-foreground">
+                    {wantsReturn ? `${heldLeg.city} → GIKI` : `GIKI → ${heldLeg.city}`}
+                </h2>
+                {dayTrips.length === 0 ? (
+                    <div className="bg-card rounded-[20px] p-6 text-center text-sm font-bold text-[#4A4766]">No buses on this day. Try another day.</div>
+                ) : (
+                    <ul className="flex flex-col gap-2.5">
+                        {dayTrips.map((t) => (
+                            <DepartureRow key={t.id} trip={t} isHeld={heldTripIds.has(t.id)} now={now} onBook={setSheetTrip} />
+                        ))}
+                    </ul>
+                )}
+
+                <div className="fixed md:static left-0 right-0 bottom-[68px] md:bottom-auto z-30 bg-card md:rounded-[22px] rounded-t-[24px] px-5 pt-4 pb-9 md:pb-4 shadow-[0_-1px_0_#E6E5EE] md:shadow-none flex items-center justify-between gap-3">
+                    <span className="text-sm text-[#4A4766]">
+                        {heldLeg.seats} seat{heldLeg.seats === 1 ? '' : 's'} held · pick the {wantsReturn ? 'return' : 'outbound'} bus to continue
+                    </span>
+                    <span className="font-display text-lg font-extrabold text-ink tabular shrink-0">Rs {formatRs(heldLeg.seats * heldLeg.priceEach)}</span>
+                </div>
+
+                {sheet}
+                {abandon}
+                <AbandonBookingModal
+                    isOpen={confirmRelease}
+                    timeLeft={timeLeft}
+                    onClose={() => setConfirmRelease(false)}
+                    onAbandon={() => {
+                        setConfirmRelease(false);
+                        void releaseAllHolds();
+                    }}
+                    onStay={() => setConfirmRelease(false)}
+                />
+            </div>
+        );
+    }
+
+    // ---------- Rides board ----------
     return (
-        <div className="max-w-5xl mx-auto w-full flex flex-col gap-4 pt-1">
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-3.5 pt-1">
+            {activeHolds.length > 0 && (
+                <HoldTimerBar
+                    timeLeft={timeLeft}
+                    message={`${activeHolds.length} seat${activeHolds.length === 1 ? '' : 's'} held for you`}
+                    actions={[
+                        { label: 'Release All', onClick: () => void releaseAllHolds() },
+                        ...(useTransportStore.getState().canProceed() ? [{ label: 'Continue', onClick: goToPayment, primary: true }] : []),
+                    ]}
+                />
+            )}
+
             <header className="flex items-center justify-between gap-3 flex-wrap">
                 <h1 className="font-display font-extrabold text-[32px] tracking-tight text-ink leading-none">Rides</h1>
-                {quota && (
+                {dirQuota && (
                     <span className="text-xs font-extrabold text-ink bg-card px-3 py-1.5 rounded-full">
-                        Weekly quota · {quota.outbound.remaining} out · {quota.inbound.remaining} back
+                        {dirQuota.remaining} of {dirQuota.limit} seats left this week
                     </span>
                 )}
             </header>
 
-            <PendingReservationBanner count={activeHolds.length} timeLeft={timeLeft} onReleaseAll={releaseAllHolds} />
-
-            {/* Dynamic Selection Summary (Cart) */}
-            <SelectionSummary
-                isRoundTrip={isRoundTrip}
-                allTrips={allTrips}
-                outboundSelection={outboundSelection}
-                returnSelection={returnSelection}
-                activeHolds={activeHolds}
-            />
-
-            <div className="flex flex-col gap-4">
-                <TransportBookingModeSelector
-                    direction={direction}
-                    onDirectionChange={setDirection}
-                    isRoundTrip={isRoundTrip}
-                    onRoundTripChange={setRoundTrip}
-                    quota={quota}
-                />
-
-                {isRoundTrip ? (
-                    <div className="flex flex-col gap-4">
-                        <p className="text-center text-sm font-bold text-iris-strong bg-iris-tint rounded-2xl py-2.5">Round trip · pick both buses</p>
-
-                        <div className="flex flex-col gap-3">
-                            <SectionTitle step="1" done={!!outboundSelection}>
-                                From GIKI
-                            </SectionTitle>
-                            <RouteGrid direction="OUTBOUND" onBook={handleBook} />
-                        </div>
-
-                        <div className="flex items-center gap-2 px-1" aria-hidden="true">
-                            <div className="flex-1 h-px bg-line" />
-                            <span className="text-xs font-bold text-muted-foreground">Then</span>
-                            <div className="flex-1 h-px bg-line" />
-                        </div>
-
-                        <div className="flex flex-col gap-3">
-                            <SectionTitle step="2" done={!!returnSelection}>
-                                To GIKI
-                            </SectionTitle>
-                            <RouteGrid direction="INBOUND" onBook={handleBook} />
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex flex-col gap-3">
-                        <SectionTitle>{direction === 'OUTBOUND' ? 'From GIKI' : 'To GIKI'}</SectionTitle>
-                        <RouteGrid direction={direction} onBook={handleBook} />
-                    </div>
-                )}
-
-                {activeHolds.length > 0 && (
-                    <div className="sticky bottom-[84px] md:bottom-6 z-10 flex flex-col items-center gap-2 pt-2">
-                        {isRoundTrip && (
-                            <div className="bg-card rounded-full px-3 py-1 shadow-sm text-xs font-bold flex items-center gap-1.5">
-                                <span className={outboundSelection ? 'text-mint' : 'text-light-gray'}>{outboundSelection ? '✓ Going' : '○ Going'}</span>
-                                <span className="text-light-gray">·</span>
-                                <span className={returnSelection ? 'text-mint' : 'text-light-gray'}>{returnSelection ? '✓ Return' : '○ Return'}</span>
-                            </div>
+            <div role="tablist" aria-label="Direction" className="grid grid-cols-2 bg-secondary rounded-2xl p-1 gap-1">
+                {(['OUTBOUND', 'INBOUND'] as const).map((d) => (
+                    <button
+                        key={d}
+                        type="button"
+                        role="tab"
+                        aria-selected={direction === d}
+                        onClick={() => {
+                            setDirection(d);
+                            setPickedDay(null);
+                        }}
+                        className={cn(
+                            'h-[42px] rounded-xl text-sm focus-visible:outline-2 focus-visible:outline-iris',
+                            direction === d ? 'bg-card text-ink font-extrabold shadow-sm' : 'text-[#4A4766] font-semibold'
                         )}
-                        <button
-                            type="button"
-                            className="w-full max-w-md h-14 rounded-[18px] bg-ink text-white text-base font-extrabold shadow-lg shadow-ink/20 disabled:bg-secondary disabled:text-[#6E6B88] disabled:shadow-none disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
-                            disabled={!canContinue}
-                            onClick={() => {
-                                if (useTransportStore.getState().canProceed()) {
-                                    if (isStudent) {
-                                        setShowConfirmModal(true);
-                                    } else {
-                                        navigate('/transport/passengers');
-                                    }
-                                }
-                            }}
-                        >
-                            {isRoundTrip ? (outboundSelection && returnSelection ? 'Confirm Booking' : 'Select Both Trips') : 'Continue'}
-                        </button>
-                    </div>
-                )}
+                    >
+                        {d === 'OUTBOUND' ? 'Leaving GIKI' : 'Back to GIKI'}
+                    </button>
+                ))}
             </div>
 
-            <BookingConfirmationModal
-                isOpen={showConfirmModal}
-                onClose={() => setShowConfirmModal(false)}
-                confirming={confirming}
-                onConfirm={handleConfirmBooking}
-                outboundSummary={outboundSummary}
-                returnSummary={returnSummary}
-                outboundHolds={outboundHolds}
-                returnHolds={returnHolds}
-                passengers={passengers}
-                onUpdatePassenger={(holdId, data) => updatePassenger(holdId, data)}
-                isStudent={isStudent}
-            />
+            <DayStrip days={days} selected={selectedDay} onSelect={setPickedDay} />
 
-            {blocker.state === 'blocked' && (
-                <AbandonBookingModal
-                    isOpen={true}
-                    timeLeft={timeLeft}
-                    onClose={() => blocker.reset?.()}
-                    onAbandon={() => {
-                        releaseAllHolds().then(() => blocker.proceed?.());
-                    }}
-                    onStay={() => blocker.reset?.()}
-                />
+            <label
+                className="flex items-center gap-3 bg-card rounded-2xl px-3.5 py-2.5"
+                title={!canBookRoundTrip ? 'Insufficient quota for Round Trip (Requires 1 Outbound + 1 Inbound)' : undefined}
+            >
+                <ArrowLeftRight className="size-5 text-ink shrink-0" aria-hidden="true" />
+                <span className="flex-1 text-sm font-bold text-ink">
+                    Round trip{' '}
+                    <span className="font-medium text-muted-foreground">
+                        {!canBookRoundTrip && !isRoundTrip ? '· needs 1 seat each way in your quota' : '· book both ways'}
+                    </span>
+                </span>
+                <Switch checked={isRoundTrip} onCheckedChange={setRoundTrip} disabled={!canBookRoundTrip && !isRoundTrip} aria-label="Round trip" />
+            </label>
+
+            {dirTrips.length === 0 ? (
+                <div className="bg-card rounded-[22px] p-6 text-center flex flex-col items-center gap-2">
+                    <span className="font-display text-lg font-extrabold text-ink">
+                        No {direction === 'OUTBOUND' ? 'outbound' : 'return'} trips this week
+                    </span>
+                    <span className="text-[13px] text-muted-foreground">New buses appear here as soon as they're scheduled.</span>
+                </div>
+            ) : dayTrips.length === 0 ? (
+                <div className="bg-card rounded-[22px] p-6 text-center flex flex-col items-center gap-2.5">
+                    <span className="font-display text-lg font-extrabold text-ink">
+                        No buses on {formatInTimeZone(new Date(`${selectedDay}T12:00:00+05:00`), TZ, 'EEEE')}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setPickedDay(firstDayWithTrips)}
+                        className="h-11 px-4 rounded-[14px] bg-iris-tint text-[#2E1A99] text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-iris"
+                    >
+                        Show {formatInTimeZone(new Date(`${firstDayWithTrips}T12:00:00+05:00`), TZ, 'EEEE')}
+                    </button>
+                </div>
+            ) : (
+                <ul className="flex flex-col gap-2.5">
+                    {dayTrips.map((t) => (
+                        <DepartureRow key={t.id} trip={t} isHeld={heldTripIds.has(t.id)} now={now} onBook={setSheetTrip} />
+                    ))}
+                </ul>
             )}
+
+            {sheet}
+            {abandon}
         </div>
     );
 };

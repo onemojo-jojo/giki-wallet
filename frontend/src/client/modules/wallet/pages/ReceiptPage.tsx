@@ -12,19 +12,22 @@ import { formatAmount, getIconBackground, getTransactionIcon, getTransactionTitl
 /** Full-page receipt for one transaction (v2-TxDetail). */
 export const ReceiptPage = () => {
     const { id } = useParams<{ id: string }>();
-    const { transactions, fetchHistory, isHistoryLoading } = useWalletModuleStore();
-    const [loaded, setLoaded] = useState(transactions.length > 0);
+    const { transactions, fetchHistory, isHistoryLoading, historyError } = useWalletModuleStore();
+    // Whether we've fetched history at least once on this page (to catch rows newer than the cached list).
+    const [refetched, setRefetched] = useState(false);
     const [copied, setCopied] = useState(false);
     const feedback = useFeedback();
 
-    useEffect(() => {
-        if (transactions.length === 0) void fetchHistory().finally(() => setLoaded(true));
-    }, [transactions.length, fetchHistory]);
 
     const t = useMemo(() => {
         const raw = transactions.find((x) => x.id === id);
         return raw ? toTransaction(raw) : null;
     }, [transactions, id]);
+
+    // Not in the cached list (empty, stale or newer) → fetch history once.
+    useEffect(() => {
+        if (!t && !refetched) void fetchHistory().finally(() => setRefetched(true));
+    }, [t, refetched, fetchHistory]);
 
     const back = (
         <Link
@@ -44,9 +47,24 @@ export const ReceiptPage = () => {
                     <h1 className="font-display font-extrabold text-xl text-ink">Receipt</h1>
                     <span className="w-11" />
                 </header>
-                <div className="bg-card rounded-3xl p-6 text-center text-[15px] font-bold text-[#4A4766]" aria-busy={!loaded || isHistoryLoading}>
-                    {!loaded || isHistoryLoading ? 'Loading receipt…' : "We couldn't find this transaction."}
-                </div>
+                {!refetched || isHistoryLoading ? (
+                    <div className="bg-card rounded-3xl p-6 text-center text-[15px] font-bold text-[#4A4766]" aria-busy="true">
+                        Loading receipt…
+                    </div>
+                ) : historyError ? (
+                    <div role="alert" className="bg-coral-tint rounded-3xl p-5 flex items-center gap-3">
+                        <span className="flex-1 text-sm font-bold text-[#8F1B21]">Couldn't load this receipt.</span>
+                        <button
+                            type="button"
+                            onClick={() => void fetchHistory()}
+                            className="h-10 px-4 rounded-xl bg-card text-[#8F1B21] text-sm font-extrabold focus-visible:outline-2 focus-visible:outline-coral"
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : (
+                    <div className="bg-card rounded-3xl p-6 text-center text-[15px] font-bold text-[#4A4766]">We couldn't find this transaction.</div>
+                )}
             </div>
         );
     }
@@ -78,8 +96,9 @@ export const ReceiptPage = () => {
                 await navigator.clipboard.writeText(text);
                 toast.success('Receipt copied — paste it anywhere');
             }
-        } catch {
-            /* user cancelled the share sheet */
+        } catch (err) {
+            // Cancelling the share sheet is fine; anything else (e.g. clipboard blocked) gets a message.
+            if ((err as DOMException)?.name !== 'AbortError') toast.error("Couldn't share the receipt on this device");
         }
     };
 

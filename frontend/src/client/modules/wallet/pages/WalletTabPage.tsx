@@ -75,7 +75,7 @@ export const WalletTabPage = () => {
                                 type="button"
                                 onClick={() => setShowBalance((v) => !v)}
                                 aria-label={showBalance ? 'Hide balance' : 'Show balance'}
-                                className="size-8 rounded-[10px] text-muted-foreground hover:text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                                className="size-11 -my-2 rounded-[12px] text-muted-foreground hover:text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
                             >
                                 {showBalance ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                             </button>
@@ -83,7 +83,7 @@ export const WalletTabPage = () => {
                                 type="button"
                                 onClick={refresh}
                                 aria-label="Refresh balance and history"
-                                className="size-8 rounded-[10px] text-muted-foreground hover:text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                                className="size-11 -my-2 rounded-[12px] text-muted-foreground hover:text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
                             >
                                 <RotateCcw className={cn('size-4', (isDataLoading || isHistoryLoading) && 'animate-spin')} />
                             </button>

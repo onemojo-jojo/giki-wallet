@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useBlocker } from 'react-router-dom';
+import { useLocation, useNavigate, useBlocker } from 'react-router-dom';
 import { ArrowLeftRight, Check, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,7 @@ import { useHoldTimer } from '../hooks';
 import { AbandonBookingModal } from '../components/AbandonBookingModal';
 import { DayStrip, type Day } from '../components/DayStrip';
 import { DepartureRow } from '../components/DepartureRow';
-import { StopSheet } from '../components/StopSheet';
+import { InlineStopPicker } from '../components/InlineStopPicker';
 import { HoldTimerBar } from '../components/HoldTimerBar';
 import { getGIKIStopObject } from '../utils';
 import { dayKey, formatClock, formatRs, summarizeLeg, TZ } from '../bookingHelpers';
@@ -22,6 +22,9 @@ const BOOKING_FLOW = ['/transport/review', '/transport/passengers', '/transport/
 
 export const TransportPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    // Opened from the web home's departures table: that bus's stop picker starts open.
+    const handoff = location.state as { openTripId?: string; direction?: 'OUTBOUND' | 'INBOUND'; day?: string } | null;
     const { user } = useAuthStore();
     const {
         allTrips,
@@ -41,9 +44,10 @@ export const TransportPage = () => {
     } = useTransportStore();
 
     const timeLeft = useHoldTimer(activeHolds);
-    const [sheetTrip, setSheetTrip] = useState<Trip | null>(null);
+    // The departure whose fare was tapped: its stop picker opens inside the row.
+    const [openTripId, setOpenTripId] = useState<string | null>(handoff?.openTripId ?? null);
     const [holding, setHolding] = useState(false);
-    const [pickedDay, setPickedDay] = useState<string | null>(null);
+    const [pickedDay, setPickedDay] = useState<string | null>(handoff?.day ?? null);
     const [confirmRelease, setConfirmRelease] = useState(false);
     const [now, setNow] = useState(() => Date.now());
 
@@ -57,6 +61,15 @@ export const TransportPage = () => {
     useEffect(() => {
         void fetchData(true);
     }, [fetchData]);
+
+    useEffect(() => {
+        if (!handoff) return;
+        if (handoff.direction && handoff.direction !== useTransportStore.getState().direction) setDirection(handoff.direction);
+        // Use it once: Back / reload must not re-open the picker or force the direction again.
+        navigate(location.pathname, { replace: true, state: null });
+        // Only on arrival.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Live "opens in" text.
     useEffect(() => {
@@ -161,7 +174,7 @@ export const TransportPage = () => {
     const dayTrips = dirTrips.filter((t) => dayKey(t.departure_time) === selectedDay);
 
     const handleHold = async (stopId: string, ticketCount: number) => {
-        const trip = sheetTrip;
+        const trip = allTrips.find((t) => t.id === openTripId);
         if (!trip) return;
         const gikiStop = getGIKIStopObject(trip.stops);
         if (!gikiStop) {
@@ -186,7 +199,7 @@ export const TransportPage = () => {
         const state = useTransportStore.getState();
         const held = state.outboundSelection?.tripId === trip.id || state.returnSelection?.tripId === trip.id;
         if (!held) return; // store already showed the error
-        setSheetTrip(null);
+        setOpenTripId(null);
         setPickedDay(null);
 
         const done = state.isRoundTrip ? !!(state.outboundSelection && state.returnSelection) : true;
@@ -208,17 +221,29 @@ export const TransportPage = () => {
         );
     }
 
-    const sheet = (
-        <StopSheet
-            key={sheetTrip?.id ?? 'none'}
-            trip={sheetTrip}
-            direction={sheetTrip?.direction.toUpperCase() === 'INBOUND' ? 'INBOUND' : 'OUTBOUND'}
-            isStudent={isStudent}
-            quotaRemaining={dirQuota?.remaining ?? null}
-            busy={holding}
-            onClose={() => setSheetTrip(null)}
-            onHold={handleHold}
-        />
+    const renderRow = (t: Trip) => (
+        <DepartureRow
+            key={t.id}
+            trip={t}
+            isHeld={heldTripIds.has(t.id)}
+            now={now}
+            expanded={openTripId === t.id}
+            onBook={(trip) => setOpenTripId((cur) => (cur === trip.id ? null : trip.id))}
+        >
+            <InlineStopPicker
+                key={t.id}
+                trip={t}
+                isStudent={isStudent}
+                quotaRemaining={dirQuota?.remaining ?? null}
+                busy={holding}
+                onHold={handleHold}
+                onCancel={() => {
+                    setOpenTripId(null);
+                    // The picker held focus; give it back to that bus's fare button.
+                    window.setTimeout(() => document.getElementById(`fare-${t.id}`)?.focus(), 0);
+                }}
+            />
+        </DepartureRow>
     );
 
     const abandon = blocker.state === 'blocked' && (
@@ -226,9 +251,7 @@ export const TransportPage = () => {
             isOpen={true}
             timeLeft={timeLeft}
             onClose={() => blocker.reset?.()}
-            onAbandon={() => {
-                releaseAllHolds().then(() => blocker.proceed?.());
-            }}
+            onAbandon={() => releaseAllHolds().then(() => blocker.proceed?.())}
             onStay={() => blocker.reset?.()}
         />
     );
@@ -287,9 +310,7 @@ export const TransportPage = () => {
                     <div className="bg-card rounded-[20px] p-6 text-center text-sm font-bold text-[#4A4766]">No buses on this day. Try another day.</div>
                 ) : (
                     <ul className="flex flex-col gap-2.5">
-                        {dayTrips.map((t) => (
-                            <DepartureRow key={t.id} trip={t} isHeld={heldTripIds.has(t.id)} now={now} onBook={setSheetTrip} />
-                        ))}
+                        {dayTrips.map(renderRow)}
                     </ul>
                 )}
 
@@ -311,16 +332,12 @@ export const TransportPage = () => {
                     Book one way instead
                 </button>
 
-                {sheet}
                 {abandon}
                 <AbandonBookingModal
                     isOpen={confirmRelease}
                     timeLeft={timeLeft}
                     onClose={() => setConfirmRelease(false)}
-                    onAbandon={() => {
-                        setConfirmRelease(false);
-                        void releaseAllHolds();
-                    }}
+                    onAbandon={() => releaseAllHolds().then(() => setConfirmRelease(false))}
                     onStay={() => setConfirmRelease(false)}
                 />
             </div>
@@ -361,6 +378,7 @@ export const TransportPage = () => {
                         onClick={() => {
                             setDirection(d);
                             setPickedDay(null);
+                            setOpenTripId(null);
                         }}
                         className={cn(
                             'h-[42px] rounded-xl text-sm focus-visible:outline-2 focus-visible:outline-iris',
@@ -410,13 +428,10 @@ export const TransportPage = () => {
                 </div>
             ) : (
                 <ul className="flex flex-col gap-2.5">
-                    {dayTrips.map((t) => (
-                        <DepartureRow key={t.id} trip={t} isHeld={heldTripIds.has(t.id)} now={now} onBook={setSheetTrip} />
-                    ))}
+                    {dayTrips.map(renderRow)}
                 </ul>
             )}
 
-            {sheet}
             {abandon}
         </div>
     );

@@ -1,131 +1,88 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { User } from 'lucide-react';
-import { Logo } from '@/shared/components/ui/Logo';
-import { Button } from '@/shared/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/shared/components/ui/dropdown-menu';
+import { Link, useLocation } from 'react-router-dom';
+import { LogoMark } from '@/shared/components/ui/Logo';
+import { useAuthStore } from '@/shared/stores/authStore';
+import { getInitials } from '@/lib/initials';
 import { MAIN_TABS, isTabActive } from '@/client/navigation';
 import { cn } from '@/lib/utils';
 
 interface ClientNavbarProps {
-    onMyBookingsClick?: () => void;
-    onMyAccountClick?: () => void;
     onSignInClick?: () => void;
     onSignUpClick?: () => void;
-    onLogoutClick?: () => void;
     isAuthenticated: boolean;
 }
 
-/** Desktop label for the centre "Pass" tab. */
-const desktopLabel = (key: string, label: string) => (key === 'pass' ? 'My Tickets' : label);
+/** v2-Web order: Home · Rides · Wallet · Tickets · Campus (the phone tab bar keeps Pass in the middle). */
+const WEB_ORDER = ['home', 'rides', 'wallet', 'pass', 'campus'] as const;
 
-export const ClientNavbar = ({
-    onMyBookingsClick,
-    onMyAccountClick,
-    onSignInClick,
-    onSignUpClick,
-    onLogoutClick,
-    isAuthenticated,
-}: ClientNavbarProps) => {
-    const navigate = useNavigate();
+/** On the web the centre "Pass" tab is the ticket list (the pass opens from there). */
+const webLink = (key: string, label: string, to: string) => (key === 'pass' ? { label: 'Tickets', to: '/tickets/all' } : { label, to });
+
+/**
+ * Student web header (v2-Web): logo, Home · Rides · Wallet · Tickets · Campus, and
+ * your avatar + first name (→ profile, where sign out lives). Signed out: Sign in / Sign up.
+ */
+export const ClientNavbar = ({ onSignInClick, onSignUpClick, isAuthenticated }: ClientNavbarProps) => {
     const { pathname } = useLocation();
-
-    const links = [
-        // About has its own desktop link, so it should not also light up Campus here.
-        ...MAIN_TABS.map((t) => ({
-            key: t.key,
-            label: desktopLabel(t.key, t.label),
-            to: t.to,
-            active: pathname !== '/about' && isTabActive(t, pathname),
-        })),
-        { key: 'about', label: 'About', to: '/about', active: pathname === '/about' },
-    ];
+    const user = useAuthStore((s) => s.user);
+    const firstName = user?.name?.split(/\s+/)[0] ?? '';
 
     return (
-        <nav className="sticky top-0 z-50 w-full border-b border-line bg-card/90 backdrop-blur-xl">
-            <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center gap-6">
-                <Link
-                    to="/"
-                    className="flex items-center group rounded-xl focus-visible:outline-2 focus-visible:outline-iris"
-                    aria-label="GIKI Wallet home"
-                >
-                    <Logo />
+        <header className="sticky top-0 z-50 w-full bg-card border-b border-line">
+            <div className="max-w-[1200px] mx-auto px-6 py-3.5 flex flex-wrap items-center gap-x-7 gap-y-4">
+                <Link to="/" className="flex items-center gap-2.5 rounded-xl text-ink focus-visible:outline-2 focus-visible:outline-iris">
+                    <LogoMark size={36} />
+                    <span className="font-display font-extrabold text-xl tracking-[-0.02em]">GIKI Wallet</span>
                 </Link>
 
-                <div className="flex-1 flex items-center gap-1 overflow-x-auto py-1.5 px-0.5">
-                    {links.map((l) => (
-                        <Link
-                            key={l.key}
-                            to={l.to}
-                            aria-current={l.active ? 'page' : undefined}
-                            className={cn(
-                                'h-10 px-3.5 rounded-xl text-sm whitespace-nowrap flex items-center transition-colors',
-                                'focus-visible:outline-2 focus-visible:outline-iris',
-                                l.active
-                                    ? 'bg-secondary text-ink font-extrabold'
-                                    : 'text-[#4A4766] font-semibold hover:bg-secondary/60 hover:text-ink'
-                            )}
-                        >
-                            {l.label}
-                        </Link>
-                    ))}
-                </div>
+                <nav aria-label="Main" className="flex-1 flex flex-wrap gap-1">
+                    {WEB_ORDER.map((key) => MAIN_TABS.find((t) => t.key === key)!).map((t) => {
+                        const { label, to } = webLink(t.key, t.label, t.to);
+                        const active = isTabActive(t, pathname);
+                        return (
+                            <Link
+                                key={t.key}
+                                to={to}
+                                aria-current={active ? 'page' : undefined}
+                                className={cn(
+                                    'px-3.5 py-2.5 rounded-xl text-sm transition-colors focus-visible:outline-2 focus-visible:outline-iris',
+                                    active ? 'bg-background text-ink font-extrabold' : 'text-[#4A4766] font-semibold hover:bg-background hover:text-ink'
+                                )}
+                            >
+                                {label}
+                            </Link>
+                        );
+                    })}
+                </nav>
 
                 {isAuthenticated ? (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label="Account menu"
-                                className="size-10 rounded-xl bg-iris text-white hover:bg-iris-strong hover:text-white"
-                            >
-                                <User className="size-5" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 mt-2 rounded-2xl p-2 border-line shadow-xl bg-card">
-                            <DropdownMenuLabel className="px-2 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                                Account
-                            </DropdownMenuLabel>
-                            <DropdownMenuItem onClick={onMyAccountClick} className="rounded-lg cursor-pointer font-semibold text-ink">
-                                Profile settings
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={onMyBookingsClick} className="rounded-lg md:hidden cursor-pointer font-semibold text-ink">
-                                My Tickets
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => navigate('/about')} className="rounded-lg md:hidden cursor-pointer font-semibold text-ink">
-                                About Us
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator className="my-1 bg-line" />
-                            <DropdownMenuItem
-                                onClick={onLogoutClick}
-                                className="text-coral focus:text-coral focus:bg-coral-tint rounded-lg cursor-pointer font-semibold"
-                            >
-                                Sign out
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Link
+                        to="/account"
+                        aria-current={pathname.startsWith('/account') ? 'page' : undefined}
+                        aria-label={`My account, ${firstName}`}
+                        className="flex items-center gap-2.5 rounded-xl text-ink focus-visible:outline-2 focus-visible:outline-iris"
+                    >
+                        <span className="size-[38px] rounded-xl bg-iris text-white flex items-center justify-center text-sm font-extrabold">{getInitials(user?.name ?? '')}</span>
+                        <span className="text-sm font-bold">{firstName}</span>
+                    </Link>
                 ) : (
                     <div className="flex items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            className="rounded-xl font-bold text-ink"
+                        <button
+                            type="button"
                             onClick={onSignInClick}
+                            className="h-10 px-4 rounded-xl text-sm font-bold text-ink hover:bg-background focus-visible:outline-2 focus-visible:outline-iris"
                         >
                             Sign in
-                        </Button>
-                        <Button className="rounded-xl font-extrabold bg-primary text-primary-foreground hover:bg-iris-strong" onClick={onSignUpClick}>
-                            Sign up
-                        </Button>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onSignUpClick}
+                            className="h-10 px-4 rounded-xl bg-iris text-white text-sm font-extrabold hover:bg-iris-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                        >
+                            Create account
+                        </button>
                     </div>
                 )}
             </div>
-        </nav>
+        </header>
     );
 };

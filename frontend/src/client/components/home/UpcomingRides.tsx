@@ -35,7 +35,10 @@ const DateChip = ({ iso, tone }: { iso: string; tone: 'iris' | 'signal' }) => (
 );
 
 /** Next booked rides and the next booking window — the "Your weekend" section on Home. */
-export const UpcomingRides = () => {
+/** `panel`: one white card with tinted rows (web home, v2-Web "Your weekend"). */
+export const UpcomingRides = ({ variant = 'cards' }: { variant?: 'cards' | 'panel' }) => {
+    const panel = variant === 'panel';
+    const rowBg = panel ? 'bg-background' : 'bg-card';
     const { myTickets, fetchUserTickets } = useTransportStore();
     const user = useAuthStore((s) => s.user);
     const [trips, setTrips] = useState<Trip[]>([]);
@@ -75,10 +78,10 @@ export const UpcomingRides = () => {
     }, [trips, user, now]);
 
     return (
-        <section aria-labelledby="home-upcoming" className="flex flex-col gap-2.5">
+        <section aria-labelledby={panel ? 'web-upcoming' : 'home-upcoming'} className={panel ? 'bg-card rounded-3xl p-5 flex flex-col gap-3' : 'flex flex-col gap-2.5'}>
             <div className="flex items-baseline justify-between">
-                <h2 id="home-upcoming" className="font-display font-bold text-xl text-ink">
-                    Your rides
+                <h2 id={panel ? 'web-upcoming' : 'home-upcoming'} className="font-display font-bold text-xl text-ink">
+                    {panel ? 'Your weekend' : 'Your rides'}
                 </h2>
                 <Link to="/tickets/all" className="text-[13px] font-extrabold text-iris-strong hover:underline">
                     All tickets
@@ -89,7 +92,7 @@ export const UpcomingRides = () => {
                 <Link
                     key={t.ticket_id}
                     to={`/tickets/${t.ticket_id}`}
-                    className="flex items-center gap-3.5 bg-card rounded-[20px] p-3.5 hover:shadow-md transition-shadow focus-visible:outline-2 focus-visible:outline-iris"
+                    className={`flex items-center gap-3.5 ${rowBg} rounded-[20px] p-3.5 hover:shadow-md transition-shadow focus-visible:outline-2 focus-visible:outline-iris`}
                 >
                     <DateChip iso={t.departure_time} tone="iris" />
                     <span className="flex-1 min-w-0 flex flex-col gap-0.5">
@@ -106,7 +109,7 @@ export const UpcomingRides = () => {
             ))}
 
             {upcoming.length === 0 && (
-                <div className="flex items-center gap-3.5 bg-card rounded-[20px] p-3.5">
+                <div className={`flex items-center gap-3.5 ${rowBg} rounded-[20px] p-3.5`}>
                     <span className="size-12 rounded-[14px] bg-iris-tint text-iris-strong flex items-center justify-center shrink-0">
                         <Bus className="size-6" aria-hidden="true" />
                     </span>

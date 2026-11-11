@@ -20,7 +20,6 @@ interface NavbarProps {
  */
 export const Navbar = ({
     variant = 'client',
-    onMyBookingsClick,
     onSignInClick,
     onSignUpClick,
     navItems,
@@ -34,7 +33,6 @@ export const Navbar = ({
 
     return (
         <ClientNavbar
-            onMyBookingsClick={onMyBookingsClick}
             onSignInClick={onSignInClick}
             onSignUpClick={onSignUpClick}
             isAuthenticated={!!user}

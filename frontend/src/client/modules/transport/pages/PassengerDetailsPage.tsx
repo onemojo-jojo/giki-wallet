@@ -229,9 +229,7 @@ export const PassengerDetailsPage = () => {
                     isOpen={true}
                     timeLeft={timeLeft}
                     onClose={() => blocker.reset?.()}
-                    onAbandon={() => {
-                        releaseAllHolds().then(() => blocker.proceed?.());
-                    }}
+                    onAbandon={() => releaseAllHolds().then(() => blocker.proceed?.())}
                     onStay={() => blocker.reset?.()}
                 />
             )}

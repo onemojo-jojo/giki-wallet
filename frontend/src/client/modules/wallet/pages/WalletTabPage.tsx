@@ -1,26 +1,182 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
-import { WalletCard } from '../components/WalletCard';
+import { Eye, EyeOff, Plus, RotateCcw } from 'lucide-react';
+import { formatInTimeZone } from 'date-fns-tz';
+import { cn } from '@/lib/utils';
+import { useWalletModuleStore } from '../store';
+import { useTopUpLimit } from '../hooks/useTopUpLimit';
+import { Transaction, TransactionFilter, matchesFilter, toTransaction } from '../utils/transactionHelpers';
+import { TransactionList } from '../components/TransactionList';
+import { TransactionReceipt } from '../components/TransactionReceipt';
+import { formatAmount } from '../components/TransactionRow';
 
-/**
- * Destination of the Wallet tab. For now it reuses the existing balance card
- * (with its history and refresh controls); the full v2 wallet screen replaces
- * it in a later revamp PR.
- */
-export const WalletTabPage = () => (
-    <div className="max-w-3xl mx-auto w-full flex flex-col gap-4 pt-1">
-        <header className="flex items-center justify-between gap-3">
-            <h1 className="font-display font-extrabold text-[32px] tracking-tight text-ink leading-none">Wallet</h1>
-            <Link
-                to="/top-up"
-                className="h-11 px-4 rounded-2xl bg-primary text-primary-foreground font-extrabold text-sm flex items-center gap-1.5 hover:bg-iris-strong transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
-            >
-                <Plus className="size-[18px]" strokeWidth={2.4} aria-hidden="true" />
-                Add money
-            </Link>
-        </header>
-        <WalletCard />
-    </div>
-);
+const TZ = 'Asia/Karachi';
+
+const FILTERS: { key: TransactionFilter; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'rides', label: 'Rides' },
+    { key: 'topups', label: 'Top-ups' },
+    { key: 'refunds', label: 'Refunds' },
+    { key: 'transfers', label: 'Transfers' },
+];
+
+/** The Wallet tab: balance, this month's in/out, and the full filterable history. */
+export const WalletTabPage = () => {
+    const { balance, transactions, isDataLoading, fetchBalance, fetchHistory } = useWalletModuleStore();
+    const maxLimit = useTopUpLimit();
+    const [showBalance, setShowBalance] = useState(true);
+    const [filter, setFilter] = useState<TransactionFilter>('all');
+    const [selected, setSelected] = useState<Transaction | null>(null);
+
+    useEffect(() => {
+        void fetchBalance();
+        void fetchHistory();
+    }, [fetchBalance, fetchHistory]);
+
+    const mapped = useMemo(() => transactions.map(toTransaction), [transactions]);
+
+    // Only show the Transfers chip if the user actually has transfers.
+    const filters = useMemo(
+        () => FILTERS.filter((f) => f.key !== 'transfers' || mapped.some((t) => matchesFilter(t, 'transfers'))),
+        [mapped]
+    );
+
+    const visible = useMemo(() => mapped.filter((t) => matchesFilter(t, filter)), [mapped, filter]);
+
+    const month = useMemo(() => {
+        const key = formatInTimeZone(new Date(), TZ, 'yyyy-MM');
+        let spent = 0;
+        let added = 0;
+        mapped.forEach((t) => {
+            if (!t.date.startsWith(key)) return;
+            if (t.amount < 0) spent += -t.amount;
+            else added += t.amount;
+        });
+        return { name: formatInTimeZone(new Date(), TZ, 'MMMM'), spent, added };
+    }, [mapped]);
+
+    const capPercent = maxLimit ? Math.min(100, Math.max(0, (balance / maxLimit) * 100)) : null;
+
+    const refresh = () => {
+        void fetchBalance();
+        void fetchHistory();
+    };
+
+    return (
+        <div className="max-w-3xl mx-auto w-full flex flex-col gap-4 pt-1">
+            <header className="flex items-center justify-between gap-3">
+                <h1 className="font-display font-extrabold text-[32px] tracking-tight text-ink leading-none">Wallet</h1>
+            </header>
+
+            <section aria-label="Balance" className="bg-card rounded-3xl p-[18px] flex flex-col gap-3.5">
+                <div className="flex items-end justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                        <span className="text-[13px] font-bold text-muted-foreground">G-Bux balance</span>
+                        <span className={cn('font-display font-extrabold text-[40px] leading-none tracking-tight tabular text-ink', isDataLoading && 'opacity-70')} aria-live="polite">
+                            {showBalance ? `Rs ${formatAmount(balance)}` : 'Rs ••••'}
+                        </span>
+                    </div>
+                    <Link
+                        to="/top-up"
+                        className="h-12 px-4 rounded-2xl bg-primary text-primary-foreground font-extrabold text-[15px] flex items-center gap-1.5 hover:bg-iris-strong shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
+                    >
+                        <Plus className="size-[18px]" strokeWidth={2.4} aria-hidden="true" />
+                        Add money
+                    </Link>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {capPercent !== null && maxLimit && showBalance ? (
+                        <div className="flex-1 flex items-center gap-2.5 min-w-0">
+                            <div
+                                role="img"
+                                aria-label={`Rs ${formatAmount(balance)} of Rs ${formatAmount(maxLimit)} wallet cap`}
+                                className="flex-1 max-w-40 h-1.5 rounded-full bg-secondary overflow-hidden"
+                            >
+                                <div className="h-full rounded-full bg-iris" style={{ width: `${capPercent}%` }} />
+                            </div>
+                            <span className="text-xs text-muted-foreground truncate">Cap Rs {formatAmount(maxLimit)}</span>
+                        </div>
+                    ) : (
+                        <span className="flex-1" />
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setShowBalance((v) => !v)}
+                        aria-label={showBalance ? 'Hide balance' : 'Show balance'}
+                        className="size-11 rounded-[14px] bg-secondary text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                    >
+                        {showBalance ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={refresh}
+                        aria-label="Refresh balance and history"
+                        className="size-11 rounded-[14px] bg-secondary text-ink flex items-center justify-center focus-visible:outline-2 focus-visible:outline-iris"
+                    >
+                        <RotateCcw className={cn('size-5', isDataLoading && 'animate-spin')} />
+                    </button>
+                </div>
+
+                {showBalance && (
+                    <div className="grid grid-cols-2 gap-2.5">
+                        <div className="bg-background rounded-2xl p-3">
+                            <span className="block text-xs font-semibold text-muted-foreground">Out · {month.name}</span>
+                            <span className="font-display text-xl font-extrabold text-ink tabular">Rs {formatAmount(month.spent)}</span>
+                        </div>
+                        <div className="bg-background rounded-2xl p-3">
+                            <span className="block text-xs font-semibold text-muted-foreground">In · {month.name}</span>
+                            <span className="font-display text-xl font-extrabold text-mint tabular">Rs {formatAmount(month.added)}</span>
+                        </div>
+                    </div>
+                )}
+            </section>
+
+            <div role="group" aria-label="Filter transactions" className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
+                {filters.map((f) => (
+                    <button
+                        key={f.key}
+                        type="button"
+                        aria-pressed={filter === f.key}
+                        onClick={() => setFilter(f.key)}
+                        className={cn(
+                            'h-10 px-4 rounded-full text-[13px] whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris',
+                            filter === f.key ? 'bg-ink text-white font-extrabold' : 'bg-card border-[1.5px] border-input text-ink font-semibold'
+                        )}
+                    >
+                        {f.label}
+                    </button>
+                ))}
+            </div>
+
+            {isDataLoading && transactions.length === 0 ? (
+                <div className="flex flex-col gap-2" aria-busy="true" aria-label="Loading transactions">
+                    {[0, 1, 2].map((i) => (
+                        <div key={i} className="bg-card rounded-[20px] p-3.5 flex items-center gap-3">
+                            <span className="size-[42px] rounded-[14px] bg-secondary" />
+                            <span className="flex-1 flex flex-col gap-2">
+                                <span className="h-3 w-2/3 rounded bg-secondary" />
+                                <span className="h-2.5 w-1/3 rounded bg-secondary/70" />
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : visible.length === 0 ? (
+                <div className="bg-card rounded-[20px] p-6 text-center flex flex-col items-center gap-2">
+                    <span className="font-display text-lg font-extrabold text-ink">
+                        {mapped.length === 0 ? 'No transactions yet' : 'Nothing here yet'}
+                    </span>
+                    <span className="text-[13px] text-muted-foreground">
+                        {mapped.length === 0 ? 'Add money to get started.' : 'Try another filter.'}
+                    </span>
+                </div>
+            ) : (
+                <TransactionList transactions={visible} onSelect={setSelected} />
+            )}
+
+            <TransactionReceipt transaction={selected} onClose={() => setSelected(null)} />
+        </div>
+    );
+};
 
 export default WalletTabPage;

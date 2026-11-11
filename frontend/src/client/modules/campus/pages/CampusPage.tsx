@@ -40,7 +40,7 @@ const ServiceCard = ({ service }: { service: CampusService }) => {
     }
 
     return (
-        <div className={className} aria-disabled="true">
+        <div className={className}>
             {body}
         </div>
     );

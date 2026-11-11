@@ -37,22 +37,28 @@ export const ClientNavbar = ({
     const { pathname } = useLocation();
 
     const links = [
-        ...MAIN_TABS.map((t) => ({ key: t.key, label: desktopLabel(t.key, t.label), to: t.to, active: isTabActive(t, pathname) })),
+        // About has its own desktop link, so it should not also light up Campus here.
+        ...MAIN_TABS.map((t) => ({
+            key: t.key,
+            label: desktopLabel(t.key, t.label),
+            to: t.to,
+            active: pathname !== '/about' && isTabActive(t, pathname),
+        })),
         { key: 'about', label: 'About', to: '/about', active: pathname === '/about' },
     ];
 
     return (
         <nav className="sticky top-0 z-50 w-full border-b border-line bg-card/90 backdrop-blur-xl">
             <div className="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center gap-6">
-                <button
-                    onClick={() => navigate('/')}
+                <Link
+                    to="/"
                     className="flex items-center group rounded-xl focus-visible:outline-2 focus-visible:outline-iris"
-                    aria-label="Go to home"
+                    aria-label="GIKI Wallet home"
                 >
                     <Logo />
-                </button>
+                </Link>
 
-                <div className="flex-1 flex items-center gap-1 overflow-x-auto">
+                <div className="flex-1 flex items-center gap-1 overflow-x-auto py-1.5 px-0.5">
                     {links.map((l) => (
                         <Link
                             key={l.key}
@@ -90,10 +96,10 @@ export const ClientNavbar = ({
                             <DropdownMenuItem onClick={onMyAccountClick} className="rounded-lg cursor-pointer font-semibold text-ink">
                                 Profile settings
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={onMyBookingsClick} className="rounded-lg cursor-pointer font-semibold text-ink">
+                            <DropdownMenuItem onClick={onMyBookingsClick} className="rounded-lg md:hidden cursor-pointer font-semibold text-ink">
                                 My Tickets
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => navigate('/about')} className="rounded-lg cursor-pointer font-semibold text-ink">
+                            <DropdownMenuItem onClick={() => navigate('/about')} className="rounded-lg md:hidden cursor-pointer font-semibold text-ink">
                                 About Us
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="my-1 bg-line" />

@@ -50,7 +50,7 @@ export const Modal = ({
                 "absolute inset-x-0 bottom-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full",
 
                 // Mobile: Lift up to expose BottomNav
-                "md:h-auto mb-[72px] md:mb-0 max-h-[60vh] md:max-h-[90vh]",
+                "md:h-auto mb-[104px] md:mb-0 max-h-[60vh] md:max-h-[90vh]",
 
                 sizeClasses[size],
                 "bg-white rounded-t-[2.5rem] md:rounded-[2.5rem] shadow-2xl transition-all duration-500 ease-in-out flex flex-col border border-slate-100/50",

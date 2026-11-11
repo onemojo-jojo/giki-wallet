@@ -453,7 +453,7 @@ func (s *Service) initiateCardPayment(
 		AmountPaisa:       AmountToPaisa(txn.Amount),
 		BillRefID:         txn.BillRefID,
 		TxnRefNo:          txn.TxnRefNo,
-		Description:       "GIKI-Wallet-TopUp",
+		Description:       "Talaria-TopUp",
 		ReturnURL:         returnURL,
 		TxnDateTime:       txnDateTime,
 		TxnExpiryDateTime: txnExpiryDateTime,

@@ -31,7 +31,7 @@ export const BalanceHero = () => {
     return (
         <section
             aria-label="Balance"
-            className="-mx-4 lg:-mx-6 -mt-4 md:mx-0 md:mt-0 relative overflow-hidden bg-ink text-white rounded-b-[32px] md:rounded-[28px] px-5 pt-[18px] pb-6 flex flex-col gap-5"
+            className="-mx-4 -mt-4 md:mx-0 md:mt-0 relative overflow-hidden bg-ink text-white rounded-b-[32px] md:rounded-[28px] px-5 pt-[18px] pb-6 flex flex-col gap-5"
         >
             <svg aria-hidden="true" className="absolute right-0 top-0 h-full w-full pointer-events-none" viewBox="0 0 390 300" preserveAspectRatio="xMaxYMin slice" fill="none">
                 <path d="M200 300 C 230 220, 330 230, 340 150 S 300 40, 410 10" stroke="#C8F04A" strokeOpacity="0.3" strokeWidth="2" strokeDasharray="1 9" strokeLinecap="round" />
@@ -39,7 +39,7 @@ export const BalanceHero = () => {
             </svg>
 
             <header className="relative flex items-center justify-between">
-                <Link to="/account" className="flex items-center gap-2.5 rounded-2xl focus-visible:outline-2 focus-visible:outline-volt" aria-label="My account">
+                <Link to="/account" className="flex items-center gap-2.5 rounded-2xl focus-visible:outline-2 focus-visible:outline-volt" aria-label={`My account, ${firstName}`}>
                     <span className="size-[42px] rounded-[14px] bg-iris flex items-center justify-center font-display font-bold text-base">
                         {getInitials(user?.name ?? '')}
                     </span>

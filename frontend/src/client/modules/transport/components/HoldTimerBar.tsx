@@ -12,7 +12,7 @@ export const HoldTimerBar = ({ timeLeft, message, actions = [] }: HoldTimerBarPr
     <div
         role="timer"
         aria-label={`${message}. ${Math.floor(timeLeft / 60)} minutes ${timeLeft % 60} seconds left`}
-        className="-mx-4 lg:-mx-6 -mt-4 md:mt-0 md:mx-0 md:rounded-2xl bg-signal-tint px-5 py-3 flex items-center gap-3"
+        className="-mx-4 -mt-4 md:mt-0 md:mx-0 md:rounded-2xl bg-signal-tint px-5 py-3 flex items-center gap-3"
     >
         <span className="font-mono font-semibold text-base text-signal-text bg-card px-2.5 py-1.5 rounded-[10px] tabular shrink-0">
             {formatClock(timeLeft)}

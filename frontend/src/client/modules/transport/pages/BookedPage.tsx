@@ -16,7 +16,7 @@ export const BookedPage = () => {
     const headline = first.direction === 'OUTBOUND' ? `You're going to ${first.city}.` : "You're heading back to GIKI.";
 
     return (
-        <div className="-mx-4 lg:-mx-6 -mt-4 md:mt-0 md:mx-auto md:max-w-xl md:rounded-[28px] relative overflow-hidden bg-ink text-white px-5 pt-6 pb-16 md:pb-8 min-h-[calc(100vh-5rem)] md:min-h-0 flex flex-col gap-6">
+        <div className="-mx-4 -mt-4 md:mt-0 md:mx-auto md:max-w-xl md:rounded-[28px] relative overflow-hidden bg-ink text-white px-5 pt-6 pb-16 md:pb-8 min-h-[calc(100vh-5rem)] md:min-h-0 flex flex-col gap-6">
             <svg aria-hidden="true" className="absolute left-0 top-0 w-full h-[360px] pointer-events-none" viewBox="0 0 390 360" preserveAspectRatio="none" fill="none">
                 <path d="M-10 300 C 80 250, 120 140, 200 160 S 330 80, 400 40" stroke="#C8F04A" strokeOpacity="0.4" strokeWidth="2.5" strokeDasharray="1 11" strokeLinecap="round" />
             </svg>

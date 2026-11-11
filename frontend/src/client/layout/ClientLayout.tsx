@@ -1,13 +1,11 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ClientNavbar, Footer } from '@/shared/components/layout';
 import { BottomNav } from '@/shared/components/layout/BottomNav';
-import { TransactionHistory } from '@/client/modules/wallet/components/TransactionHistory';
 import { FeedbackModal } from '@/client/modules/feedback/components/FeedbackModal';
 import { useFeedback } from '@/client/modules/feedback/hooks/useFeedback';
 import { Button } from '@/shared/components/ui/button';
-import { WalletProvider } from '@/context/WalletContext';
 import { useAuthStore } from '@/shared/stores/authStore';
 import { toast } from '@/lib/toast';
 
@@ -19,18 +17,11 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
     const navigate = useNavigate();
     const { pathname } = useLocation();
     const { user, signOut } = useAuthStore();
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     // Keep the floating feedback button off the payment and booking screens, where it would sit on the keypad / primary actions.
     const hideFeedbackButton = pathname.startsWith('/top-up') || pathname.startsWith('/payment') || pathname.startsWith('/transport');
 
 
-    const handleHistoryClick = () => {
-        setIsHistoryOpen(true);
-    };
 
-    const handleTopUpClick = () => {
-        navigate('/top-up');
-    };
 
 
 
@@ -65,13 +56,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
     } = useFeedback();
 
     return (
-        <WalletProvider
-            onHistoryClick={handleHistoryClick}
-            onTopUpClick={handleTopUpClick}
-
-            onMyTicketsClick={handleMyTicketsClick}
-            onMyAccountClick={handleMyAccountClick}
-        >
+        <>
             <div className="min-h-screen flex flex-col bg-background font-body pb-28 md:pb-0">
                 <div className="hidden md:block">
                     <ClientNavbar
@@ -84,7 +69,6 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                     />
                 </div>
 
-                {/* Mobile Top Bar */}
                 {/* No mobile top bar: each screen starts with its own title (v2 design); Home has the avatar. */}
 
                 <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full px-4 lg:px-6 py-4 md:py-12">
@@ -99,10 +83,6 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                 <BottomNav />
 
                 {/* Modals */}
-                <TransactionHistory
-                    isOpen={isHistoryOpen}
-                    onClose={() => setIsHistoryOpen(false)}
-                />
                 <FeedbackModal
                     isOpen={isFeedbackOpen}
                     onClose={closeFeedback}
@@ -123,7 +103,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                     </div>
                 )}
             </div>
-        </WalletProvider>
+        </>
     );
 };
 

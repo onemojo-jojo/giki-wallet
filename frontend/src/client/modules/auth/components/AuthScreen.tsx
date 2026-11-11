@@ -44,7 +44,7 @@ export const AuthProgress = ({ step, total = 3 }: { step: number; total?: number
                 <span key={i} className={cn('h-1.5 rounded-full', i < step ? 'bg-iris' : 'bg-line')} />
             ))}
         </div>
-        <span className="text-[13px] font-bold text-muted-foreground tabular">
+        <span aria-hidden="true" className="text-[13px] font-bold text-muted-foreground tabular">
             {step} / {total}
         </span>
     </>

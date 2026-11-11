@@ -16,7 +16,8 @@ export const AuthField = forwardRef<HTMLInputElement, AuthFieldProps>(({ label, 
     const id = useId();
     const [shown, setShown] = useState(false);
     const isPassword = type === 'password';
-    const describedBy = [error ? `${id}-err` : '', hint ? `${id}-hint` : ''].filter(Boolean).join(' ') || undefined;
+    // The hint is hidden while an error shows, so only point at what's rendered.
+    const describedBy = error ? `${id}-err` : hint ? `${id}-hint` : undefined;
 
     return (
         <div className="flex flex-col gap-1.5">

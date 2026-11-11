@@ -27,6 +27,7 @@ export const VerifyEmailPage = () => {
             const raw = e instanceof Error ? e.message : '';
             // Never show a bare HTTP status to people.
             const msg = !raw || /status code/i.test(raw) ? 'This verification link is invalid or has expired.' : raw;
+            toast.error(msg);
             setError(msg);
             setBusy(false);
         }

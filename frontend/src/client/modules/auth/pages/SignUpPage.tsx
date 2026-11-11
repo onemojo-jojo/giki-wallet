@@ -22,10 +22,13 @@ export const SignUpPage = () => {
     const [regNo, setRegNo] = useState('');
     const [nameError, setNameError] = useState<string>();
     const [createdEmail, setCreatedEmail] = useState('');
+    // The email we filled in from the reg no (so a corrected reg no can update it).
+    const [autoEmail, setAutoEmail] = useState('');
 
     const {
         register,
         handleSubmit,
+        reset,
         setValue,
         getValues,
         control,
@@ -48,9 +51,23 @@ export const SignUpPage = () => {
             return;
         }
         setNameError(undefined);
-        // Fill the email from the registration number if the user hasn't typed one yet.
-        if (isStudent && regNo.trim() && !getValues('email')) setValue('email', emailFromRegNo(regNo));
+        // Fill the email from the registration number, unless the user has typed their own.
+        const current = getValues('email');
+        if (isStudent && regNo.trim() && (!current || current === autoEmail)) {
+            const filled = emailFromRegNo(regNo);
+            setValue('email', filled);
+            setAutoEmail(filled);
+        }
         setStep(2);
+    };
+
+    // After an account is created, a different email means a new sign-up (the first account stays unverified).
+    const startOver = () => {
+        reset();
+        setRegNo('');
+        setAutoEmail('');
+        setCreatedEmail('');
+        setStep(1);
     };
 
     const onSubmit = async (data: SignUpFormData) => {
@@ -68,6 +85,11 @@ export const SignUpPage = () => {
                 user_type: data.userType,
                 reg_id: regId || '',
             });
+            if (data.userType === 'STUDENT') {
+                toast.success('Account created. Please check your email to verify, then sign in.');
+            } else {
+                toast.success('Account created. Your account may require approval before you can sign in.');
+            }
             setCreatedEmail(data.email.trim());
             setStep(3);
         } catch (e) {
@@ -104,7 +126,7 @@ export const SignUpPage = () => {
 
     const header = (
         <div className="flex items-center gap-3.5">
-            {step === 1 ? <AuthBack /> : <AuthBack onClick={() => setStep(step === 3 ? 2 : 1)} />}
+            {step === 1 ? <AuthBack /> : step === 2 ? <AuthBack onClick={() => setStep(1)} /> : <AuthBack fallback="/auth/sign-in" />}
             <AuthProgress step={step} />
         </div>
     );
@@ -113,7 +135,7 @@ export const SignUpPage = () => {
         return (
             <AuthScreen className="gap-5">
                 {header}
-                {isStudent ? <CheckInbox email={createdEmail} onChangeEmail={() => setStep(2)} /> : <AwaitingApproval email={createdEmail} />}
+                {isStudent ? <CheckInbox email={createdEmail} onChangeEmail={startOver} /> : <AwaitingApproval email={createdEmail} />}
             </AuthScreen>
         );
     }
@@ -123,7 +145,14 @@ export const SignUpPage = () => {
             {header}
 
             {step === 1 ? (
-                <>
+                <form
+                    noValidate
+                    className="flex-1 flex flex-col gap-5"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        continueFromStep1();
+                    }}
+                >
                     <AuthTitle title="Who are you at GIKI?" sub="This decides which buses you see and how many seats you can book." />
                     <fieldset className="flex flex-col gap-3">
                         <legend className="sr-only">Account type</legend>
@@ -150,10 +179,10 @@ export const SignUpPage = () => {
                             />
                         )}
                     </div>
-                    <button type="button" onClick={continueFromStep1} className={cn(primaryBtn, 'mt-auto')}>
+                    <button type="submit" className={cn(primaryBtn, 'mt-auto')}>
                         Continue
                     </button>
-                </>
+                </form>
             ) : (
                 <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex-1 flex flex-col gap-5">
                     <AuthTitle title="Your account" sub={isStudent ? 'We’ll send a verification link to your GIKI email.' : 'Use your work email. An admin approves staff accounts.'} />

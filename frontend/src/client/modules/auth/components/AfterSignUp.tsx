@@ -51,7 +51,7 @@ export const CheckInbox = ({ email, onChangeEmail }: { email: string; onChangeEm
             <p className="text-center text-[13px] text-muted-foreground">
                 Wrong email?{' '}
                 <button type="button" onClick={onChangeEmail} className="font-extrabold text-iris-strong hover:underline">
-                    Change it
+                    Sign up again
                 </button>
             </p>
         </div>

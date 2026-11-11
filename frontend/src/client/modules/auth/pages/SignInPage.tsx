@@ -87,7 +87,8 @@ export const SignInPage = () => {
                     Forgot password?
                 </Link>
                 {errors.form && (
-                    <p role="alert" className="rounded-2xl bg-coral-tint px-4 py-3 text-sm font-semibold text-[#8F1B21]">
+                    // Not role="alert": the toast already announces it.
+                    <p className="rounded-2xl bg-coral-tint px-4 py-3 text-sm font-semibold text-[#8F1B21]">
                         {errors.form}
                     </p>
                 )}

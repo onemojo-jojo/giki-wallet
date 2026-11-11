@@ -62,11 +62,12 @@ export const ProfilePage = () => {
     const { user, signOut } = useAuthStore();
     const feedback = useFeedback();
     const [quota, setQuota] = useState<QuotaResponse | null>(null);
+    const [quotaFailed, setQuotaFailed] = useState(false);
 
     useEffect(() => {
         getQuota()
             .then(setQuota)
-            .catch(() => setQuota(null));
+            .catch(() => setQuotaFailed(true));
     }, []);
 
     if (!user) return null;
@@ -80,7 +81,10 @@ export const ProfilePage = () => {
         navigate('/auth/sign-in', { replace: true });
     };
 
-    const quotaText = quota ? `Out ${quota.outbound.remaining} of ${quota.outbound.limit} · Back ${quota.inbound.remaining} of ${quota.inbound.limit} left` : '—';
+    // A limit of 0 means the server has no quota rule for this role/direction, not "used up".
+    const part = (label: string, q: { limit: number; remaining: number }) => (q.limit > 0 ? `${label} ${q.remaining} of ${q.limit} left` : `${label} no limit`);
+    const quotaText = quota ? `${part('Out', quota.outbound)} · ${part('Back', quota.inbound)}` : quotaFailed ? 'Unavailable' : '…';
+    const hasRideAccount = isStudent || user.user_type === 'EMPLOYEE';
 
     return (
         <div className="max-w-xl mx-auto w-full flex flex-col gap-4 pt-1">
@@ -113,7 +117,7 @@ export const ProfilePage = () => {
                 <div className="flex items-center justify-between gap-3 px-[18px] py-3 bg-ink-2">
                     <span className="flex items-center gap-1.5 text-xs font-extrabold text-volt">
                         <BadgeCheck className="size-4" aria-hidden="true" />
-                        {isStudent ? 'Verified via GIKI email' : 'Approved staff account'}
+                        {isStudent ? 'Verified via GIKI email' : user.user_type === 'EMPLOYEE' ? 'Approved staff account' : 'Admin account'}
                     </span>
                     <Link to="/tickets" className="text-[13px] font-extrabold text-white rounded focus-visible:outline-2 focus-visible:outline-volt">
                         Show QR
@@ -127,7 +131,7 @@ export const ProfilePage = () => {
                     { label: 'Phone for JazzCash', value: <span className="font-mono">{maskPhone(user.phone_number)}</span> },
                     { label: 'Account type', value: user.user_type === 'EMPLOYEE' ? 'Faculty or staff' : user.user_type.charAt(0) + user.user_type.slice(1).toLowerCase().replace(/_/g, ' ') },
                     { label: 'Password', value: 'Reset by email', to: '/auth/forgot-password' },
-                    { label: 'Weekly ride quota', value: quotaText, to: '/transport' },
+                    ...(hasRideAccount ? [{ label: 'Weekly ride quota', value: quotaText, to: '/transport' }] : []),
                 ]}
             />
 

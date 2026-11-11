@@ -140,7 +140,7 @@ const AboutPage = () => {
 
             <section aria-labelledby="team" className="flex flex-col gap-2">
                 <h2 id="team" className="px-1 flex items-center gap-1.5 text-xs font-extrabold tracking-[0.08em] text-muted-foreground">
-                    MADE WITH <Heart className="size-3 fill-coral text-coral" aria-label="love" /> IN GIK INSTITUTE
+                    MADE WITH <Heart className="size-3 fill-coral text-coral" role="img" aria-label="love" /> IN GIK INSTITUTE
                 </h2>
                 <ul className="bg-card rounded-[20px] px-4">
                     {teamMembers.map((m, i) => (

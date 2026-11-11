@@ -57,7 +57,7 @@ export const BalanceHero = () => {
                         type="button"
                         onClick={() => setShowBalance((v) => !v)}
                         aria-label={showBalance ? 'Hide balance' : 'Show balance'}
-                        className="size-8 rounded-[10px] text-ink-muted hover:text-white flex items-center justify-center focus-visible:outline-2 focus-visible:outline-volt"
+                        className="size-11 -my-2 rounded-[12px] text-ink-muted hover:text-white flex items-center justify-center focus-visible:outline-2 focus-visible:outline-volt"
                     >
                         {showBalance ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
@@ -65,7 +65,7 @@ export const BalanceHero = () => {
                         type="button"
                         onClick={() => void fetchBalance()}
                         aria-label="Refresh balance"
-                        className="size-8 rounded-[10px] text-ink-muted hover:text-white flex items-center justify-center focus-visible:outline-2 focus-visible:outline-volt"
+                        className="size-11 -my-2 rounded-[12px] text-ink-muted hover:text-white flex items-center justify-center focus-visible:outline-2 focus-visible:outline-volt"
                     >
                         <RotateCcw className={cn('size-4', isDataLoading && 'animate-spin')} />
                     </button>

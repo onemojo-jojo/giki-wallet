@@ -1,6 +1,4 @@
-import { Button } from '@/shared/components/ui/button';
 import { Modal } from '@/shared/components/ui/Modal';
-import { Clock } from 'lucide-react';
 
 interface AbandonBookingModalProps {
     isOpen: boolean;
@@ -18,41 +16,33 @@ export function AbandonBookingModal({ isOpen, onClose, timeLeft, onAbandon, onSt
     };
 
     return (
-        <Modal
-            isOpen={isOpen}
-            onClose={onClose}
-            title="Abandon Booking?"
-        >
-            <div className="p-6">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center text-red-500 border border-red-100 shadow-sm">
-                        <Clock className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Active Reservation</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Time remaining: {formatTime(timeLeft)}</p>
-                    </div>
+        <Modal isOpen={isOpen} onClose={onClose} title="Abandon Booking?">
+            <div className="flex flex-col gap-5">
+                <div className="flex items-center gap-3 bg-signal-tint rounded-2xl p-3.5">
+                    <span className="font-mono font-semibold text-base text-signal-text bg-card px-2.5 py-1.5 rounded-xl tabular">{formatTime(timeLeft)}</span>
+                    <span className="text-sm font-extrabold text-[#4A2800]">Active reservation</span>
                 </div>
 
-                <p className="text-sm text-slate-600 mb-8 font-medium leading-relaxed">
-                    You have pending seat reservations. Leaving this page will **release your seats** and free up your weekly quota.
-                    Do you want to proceed?
+                <p className="text-[15px] text-[#4A4766] leading-relaxed">
+                    You have seats on hold. Leaving this page will <strong className="text-ink">release your seats</strong> and free up your weekly
+                    quota. Do you want to proceed?
                 </p>
 
-                <div className="flex flex-col gap-3">
-                    <Button
-                        className="w-full h-14 rounded-2xl font-black text-xs uppercase tracking-[0.2em] bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 transition-all duration-300 active:scale-[0.98]"
+                <div className="flex flex-col gap-2.5">
+                    <button
+                        type="button"
                         onClick={onAbandon}
+                        className="h-14 rounded-[18px] bg-coral text-white text-base font-extrabold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral"
                     >
-                        Yes, Release & Leave
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        className="w-full h-12 rounded-2xl font-bold text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all"
+                        Yes, Release &amp; Leave
+                    </button>
+                    <button
+                        type="button"
                         onClick={onStay}
+                        className="h-12 rounded-2xl border-[1.5px] border-input bg-card text-ink text-[15px] font-extrabold focus-visible:outline-2 focus-visible:outline-iris"
                     >
                         No, Stay Here
-                    </Button>
+                    </button>
                 </div>
             </div>
         </Modal>

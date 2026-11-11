@@ -24,7 +24,7 @@ export default function BookingConfirmationPage() {
             }));
 
             await confirmBooking(confirmations);
-            navigate('/transport/tickets');
+            navigate('/tickets');
         } catch (e) {
             setSubmitting(false);
         }
@@ -36,16 +36,16 @@ export default function BookingConfirmationPage() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-6">Confirm Booking Details</h1>
+        <div className="max-w-2xl mx-auto w-full pt-1 flex flex-col gap-5">
+            <h1 className="font-display text-2xl font-extrabold text-ink tracking-tight">Confirm Booking Details</h1>
 
-            <div className="space-y-4">
+            <div className="flex flex-col gap-3">
                 {activeHolds.map((hold, idx) => (
-                    <div key={hold.id} className="bg-white rounded-lg shadow p-4">
-                        <h3 className="font-semibold mb-3">Ticket {idx + 1}</h3>
+                    <div key={hold.id} className="bg-card rounded-[20px] p-4">
+                        <h3 className="text-xs font-extrabold text-muted-foreground uppercase tracking-[0.06em] mb-3">Ticket {idx + 1}</h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-xs font-bold text-[#4A4766] mb-1">
                                     Passenger Name
                                 </label>
                                 <input
@@ -55,11 +55,11 @@ export default function BookingConfirmationPage() {
                                         ...passengers[hold.id],
                                         name: e.target.value
                                     })}
-                                    className="w-full px-3 py-2 border rounded-lg"
+                                    className="w-full h-12 px-3.5 rounded-xl border-[1.5px] border-input bg-card text-[15px] font-semibold text-ink outline-none focus:border-iris focus:border-2"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                <label className="block text-xs font-bold text-[#4A4766] mb-1">
                                     Relation
                                 </label>
                                 <select
@@ -68,7 +68,7 @@ export default function BookingConfirmationPage() {
                                         ...passengers[hold.id],
                                         relation: e.target.value as 'SELF' | 'SPOUSE' | 'CHILD'
                                     })}
-                                    className="w-full px-3 py-2 border rounded-lg"
+                                    className="w-full h-12 px-3.5 rounded-xl border-[1.5px] border-input bg-card text-[15px] font-semibold text-ink outline-none focus:border-iris focus:border-2"
                                 >
                                     <option value="SELF">Self</option>
                                     <option value="SPOUSE">Spouse</option>
@@ -83,7 +83,7 @@ export default function BookingConfirmationPage() {
             <button
                 onClick={handleConfirm}
                 disabled={submitting || loading}
-                className="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="w-full h-14 rounded-[18px] bg-ink text-white text-base font-extrabold disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
             >
                 {submitting ? 'Confirming...' : 'Confirm Booking'}
             </button>

@@ -29,8 +29,8 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
     const { pathname } = useLocation();
     const { user, signOut } = useAuthStore();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-    // Keep the floating feedback button off the payment screens, where it would sit on the keypad / actions.
-    const hideFeedbackButton = pathname.startsWith('/top-up') || pathname.startsWith('/payment');
+    // Keep the floating feedback button off the payment and booking screens, where it would sit on the keypad / primary actions.
+    const hideFeedbackButton = pathname.startsWith('/top-up') || pathname.startsWith('/payment') || pathname.startsWith('/transport');
 
 
     const handleHistoryClick = () => {

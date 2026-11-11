@@ -95,7 +95,7 @@ export function BookingConfirmationModal({
                                 {outboundSummary.seats} Seat(s)
                             </p>
                         </div>
-                        <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-3 flex items-center gap-2">
+                        <p className="text-[10px] font-black text-iris-strong uppercase tracking-widest mt-3 flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-accent" />
                             {outboundSummary.pickup} → {outboundSummary.dropoff}
                         </p>
@@ -115,7 +115,7 @@ export function BookingConfirmationModal({
                                 {returnSummary.seats} Seat(s)
                             </p>
                         </div>
-                        <p className="text-[10px] font-black text-primary/60 uppercase tracking-widest mt-3 flex items-center gap-2">
+                        <p className="text-[10px] font-black text-iris-strong uppercase tracking-widest mt-3 flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                             {returnSummary.pickup} → {returnSummary.dropoff}
                         </p>

@@ -108,7 +108,7 @@ export const TripSummaryTile = () => {
                 </div>
                 {trip.status === 'SCHEDULED' ? (
                     <div className="flex flex-col items-end gap-0.5">
-                        <span className="text-[7px] font-bold text-primary/60 uppercase tracking-wider flex items-center gap-0.5">
+                        <span className="text-[7px] font-bold text-iris-strong uppercase tracking-wider flex items-center gap-0.5">
                             <Clock className="w-2 h-2" />
                             Opens
                         </span>

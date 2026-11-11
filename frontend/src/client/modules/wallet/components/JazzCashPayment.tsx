@@ -120,7 +120,7 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({
                                             <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center relative z-10 mx-auto">
                                                 <Clock className="w-12 h-12 text-primary animate-pulse" />
                                             </div>
-                                            <p className="text-primary/60 text-sm font-bold uppercase tracking-tighter mt-4">Waiting for Approval...</p>
+                                            <p className="text-iris-strong text-sm font-bold uppercase tracking-tighter mt-4">Waiting for Approval...</p>
                                         </div>
                                     )}
                                 </>

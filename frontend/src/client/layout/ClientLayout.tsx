@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogoMark } from '@/shared/components/ui/Logo';
 import { ClientNavbar, Footer } from '@/shared/components/layout';
 import { BottomNav } from '@/shared/components/layout/BottomNav';
@@ -26,8 +26,11 @@ const getInitials = (name: string) =>
 
 export const ClientLayout = ({ children }: ClientLayoutProps) => {
     const navigate = useNavigate();
+    const { pathname } = useLocation();
     const { user, signOut } = useAuthStore();
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    // Keep the floating feedback button off the payment screens, where it would sit on the keypad / actions.
+    const hideFeedbackButton = pathname.startsWith('/top-up') || pathname.startsWith('/payment');
 
 
     const handleHistoryClick = () => {
@@ -138,7 +141,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                 />
 
                 {/* Floating Feedback Trigger */}
-                {!!user && (
+                {!!user && !hideFeedbackButton && (
                     <div className="fixed bottom-[104px] right-4 md:bottom-8 md:right-8 z-40">
                         <Button
                             onClick={openFeedback}

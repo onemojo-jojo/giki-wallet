@@ -5,7 +5,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { useTransportStore } from '@/client/modules/transport/store';
 import { getWeeklySummary } from '@/client/modules/transport/api';
 import type { MyTicket, Trip } from '@/client/modules/transport/validators';
-import { formatTime12 } from '@/client/modules/transport/utils';
+const formatTime12 = (iso: string) => formatInTimeZone(new Date(iso), TZ, 'h:mm a');
 import { useAuthStore } from '@/shared/stores/authStore';
 
 const TZ = 'Asia/Karachi';

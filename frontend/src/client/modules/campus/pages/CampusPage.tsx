@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ABOUT_LINK, CAMPUS_SERVICES, type CampusService } from '../services';
 
@@ -56,11 +56,21 @@ export const CampusPage = () => {
                 <p className="text-sm text-muted-foreground">One balance for everything on campus.</p>
             </header>
 
+            {CAMPUS_SERVICES.some((s) => s.status === 'soon') && (
+                <div role="note" className="flex items-center gap-2.5 bg-iris-tint text-[#2E1A99] rounded-[14px] px-3.5 py-2.5 text-[13px] font-bold">
+                    <Info className="size-[18px] shrink-0" aria-hidden="true" />
+                    {CAMPUS_SERVICES.filter((s) => s.status === 'soon')
+                        .map((s) => s.name)
+                        .join(' and ')}{' '}
+                    are coming soon to G-Bux.
+                </div>
+            )}
+
             <section aria-labelledby="campus-services" className="flex flex-col gap-2.5">
                 <h2 id="campus-services" className="font-display font-bold text-xl text-ink">
                     Pay on campus
                 </h2>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5">
                     {CAMPUS_SERVICES.map((service) => (
                         <ServiceCard key={service.key} service={service} />
                     ))}

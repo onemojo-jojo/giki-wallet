@@ -1,7 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { MessageSquarePlus } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LogoMark } from '@/shared/components/ui/Logo';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ClientNavbar, Footer } from '@/shared/components/layout';
 import { BottomNav } from '@/shared/components/layout/BottomNav';
 import { TransactionHistory } from '@/client/modules/wallet/components/TransactionHistory';
@@ -15,14 +14,6 @@ import { toast } from '@/lib/toast';
 interface ClientLayoutProps {
     children: ReactNode;
 }
-
-const getInitials = (name: string) =>
-    name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() ?? '')
-        .join('') || '?';
 
 export const ClientLayout = ({ children }: ClientLayoutProps) => {
     const navigate = useNavigate();
@@ -94,28 +85,7 @@ export const ClientLayout = ({ children }: ClientLayoutProps) => {
                 </div>
 
                 {/* Mobile Top Bar */}
-                <header className="md:hidden sticky top-0 z-40 bg-background/90 backdrop-blur-xl border-b border-line h-16 flex items-center justify-between px-4">
-                    <Link to="/" className="flex items-center gap-2.5 rounded-xl focus-visible:outline-2 focus-visible:outline-iris">
-                        <LogoMark size={34} />
-                        <span className="font-display font-extrabold text-xl text-ink tracking-tight">GIKI Wallet</span>
-                    </Link>
-                    {user ? (
-                        <Link
-                            to="/account"
-                            aria-label="My account"
-                            className="size-11 rounded-[14px] bg-iris text-white font-display font-bold text-[15px] flex items-center justify-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
-                        >
-                            {getInitials(user.name)}
-                        </Link>
-                    ) : (
-                        <Link
-                            to="/auth/sign-in"
-                            className="h-10 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-extrabold flex items-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-iris"
-                        >
-                            Sign in
-                        </Link>
-                    )}
-                </header>
+                {/* No mobile top bar: each screen starts with its own title (v2 design); Home has the avatar. */}
 
                 <main className="flex-1 flex flex-col max-w-5xl mx-auto w-full px-4 lg:px-6 py-4 md:py-12">
                     {children}

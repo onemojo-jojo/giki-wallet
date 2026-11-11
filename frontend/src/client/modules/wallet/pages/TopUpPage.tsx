@@ -31,8 +31,8 @@ const TopUpPage = () => {
     const maxLimit = loadedLimit ?? FALLBACK_MAX_LIMIT;
 
     const { balance, fetchBalance, formData, setAmount, setMethod, setMobileNumber, setCnicLastSix, resetFormData, resetPaymentState } = useWalletModuleStore();
-    const [saved, setSaved] = useState<SavedJazzCash | null>(() => loadSavedJazzCash());
-    const [choice, setChoice] = useState<MethodChoice>(() => (loadSavedJazzCash() ? 'saved' : 'jazz'));
+    const [saved, setSaved] = useState<SavedJazzCash | null>(loadSavedJazzCash);
+    const [choice, setChoice] = useState<MethodChoice>(() => (saved ? 'saved' : 'jazz'));
 
     useEffect(() => {
         void fetchBalance();
@@ -153,7 +153,8 @@ const TopUpPage = () => {
             if (choice === 'saved' && saved) {
                 setMobileNumber(saved.mobile);
                 setCnicLastSix(saved.cnicLast6);
-            } else {
+            } else if (saved && formData.mobile_number === saved.mobile && formData.cnic_last_six === saved.cnicLast6) {
+                // "Another number": clear the saved details, but keep anything the user typed before going Back.
                 setMobileNumber('');
                 setCnicLastSix('');
             }

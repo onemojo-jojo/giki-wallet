@@ -5,10 +5,10 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Keypad } from '@/shared/components/ui/Keypad';
 import { useIsPhone } from '@/shared/hooks/useIsPhone';
-import { JAZZCASH_PAYMENT_TIMEOUT_SECONDS, useJazzCashPayment } from '../hooks/useJazzCashPayment';
+import { JAZZCASH_PAYMENT_TIMEOUT_SECONDS, JAZZCASH_TIMEOUT_MESSAGE, useJazzCashPayment } from '../hooks/useJazzCashPayment';
 import { useWalletModuleStore } from '../store';
 import { formatAmount } from '../utils/transactionHelpers';
-import { maskMobile, saveJazzCash } from '../utils/savedJazzCash';
+import { CNIC_RE, MOBILE_RE, maskMobile, normalizeMobile, saveJazzCash } from '../utils/savedJazzCash';
 import { TopUpStepHeader } from './TopUpStepHeader';
 
 interface JazzCashPaymentProps {
@@ -25,10 +25,6 @@ interface JazzCashPaymentProps {
     autoStart?: boolean;
 }
 
-// Backend accepts 03XXXXXXXXX or 3XXXXXXXXX (backend/internal/payment/utils.go).
-const MOBILE_RE = /^(03\d{9}|3\d{9})$/;
-const CNIC_RE = /^\d{6}$/;
-const TIMEOUT_MESSAGE = 'Payment timed out. Please try again.';
 
 const RING_R = 96;
 const RING_C = 2 * Math.PI * RING_R;
@@ -62,10 +58,13 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
     React.useEffect(() => {
         if (status === 'success') {
             setFinishedAt(new Date());
+            // Only details that actually worked are remembered, and only if the box is ticked.
+            if (remember && MOBILE_RE.test(phoneNumber) && CNIC_RE.test(cnicLast6)) saveJazzCash({ mobile: phoneNumber, cnicLast6 });
             toast.success(`G-Bux ${amount.toLocaleString()} added to wallet!`);
             if (onSuccess) onSuccess();
         }
         if (status === 'failed' && onFailure) onFailure(errorMessage || 'Unknown error');
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- run on status change only; fields are fixed while paying
     }, [status, onSuccess, onFailure, errorMessage, amount]);
 
     const mobileValid = MOBILE_RE.test(phoneNumber);
@@ -76,7 +75,6 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
             toast.error(`Top-up would exceed maximum allowed wallet balance of RS ${maxLimit}`);
             return;
         }
-        if (remember && !autoStart) saveJazzCash({ mobile: phoneNumber, cnicLast6 });
         void initiatePayment();
     };
 
@@ -101,7 +99,11 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
             const next = (phoneNumber + k).replace(/\D/g, '').slice(0, 11);
             setMobileNumber(next);
             // Move to the CNIC boxes once the number is complete.
-            if (next.length === 11 && MOBILE_RE.test(next)) setFocus('cnic');
+            if (MOBILE_RE.test(next)) {
+                setFocus('cnic');
+                // Move real focus too, so tapping the number field again fires onFocus.
+                cnicInputRef.current?.focus();
+            }
         }
         else setCnicLastSix((cnicLast6 + k).replace(/\D/g, '').slice(0, 6));
     };
@@ -166,7 +168,7 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
 
     // ---------------- Failed / timed out (v2-TopUpFailed) ----------------
     if (status === 'failed') {
-        const timedOut = errorMessage === TIMEOUT_MESSAGE;
+        const timedOut = errorMessage === JAZZCASH_TIMEOUT_MESSAGE;
         return (
             <div className="flex flex-col gap-5 pt-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
                 <span className="self-center size-[120px] rounded-[40px] bg-signal-tint flex items-center justify-center">
@@ -177,7 +179,7 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
                     <p className="text-[15px] leading-relaxed text-[#4A4766] max-w-[300px]">
                         {timedOut ? (
                             <>
-                                JazzCash didn't get an approval in time. <strong className="text-ink">No money left your account.</strong>
+                                JazzCash didn't get an approval in time. <strong className="text-ink">If you didn't approve it, no money left your account.</strong>
                             </>
                         ) : (
                             readableError(errorMessage)
@@ -341,10 +343,10 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({ amount, onSuccess, on
                         autoComplete="tel-national"
                         value={phoneNumber}
                         onFocus={() => setFocus('mobile')}
-                        onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                        onClick={() => setFocus('mobile')}
+                        onChange={(e) => setMobileNumber(normalizeMobile(e.target.value))}
                         placeholder="03XX XXXXXXX"
-                        maxLength={11}
-                        aria-invalid={phoneNumber.length >= 10 && !mobileValid ? true : undefined}
+                        aria-invalid={!mobileValid && (phoneNumber.length === 11 || (phoneNumber.length === 10 && !phoneNumber.startsWith('0'))) ? true : undefined}
                         className="flex-1 min-w-0 bg-transparent outline-none font-mono text-lg font-semibold tracking-[0.04em] text-ink placeholder:text-light-gray"
                     />
                     {mobileValid && <Check className="size-5 text-mint" strokeWidth={2.6} aria-label="Valid number" />}

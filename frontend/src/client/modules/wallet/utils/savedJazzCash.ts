@@ -6,12 +6,24 @@ export type SavedJazzCash = { mobile: string; cnicLast6: string };
 
 const KEY = 'gw.savedJazzCash';
 
+// Backend accepts 03XXXXXXXXX or 3XXXXXXXXX (backend/internal/payment/utils.go).
+export const MOBILE_RE = /^(03\d{9}|3\d{9})$/;
+export const CNIC_RE = /^\d{6}$/;
+
+/** Digits only; a pasted +92 / 0092 prefix becomes the local 0. */
+export const normalizeMobile = (input: string) => {
+    let d = input.replace(/\D/g, '');
+    if (d.startsWith('0092')) d = '0' + d.slice(4);
+    else if (d.startsWith('92') && d.length >= 12) d = '0' + d.slice(2);
+    return d.slice(0, 11);
+};
+
 export const loadSavedJazzCash = (): SavedJazzCash | null => {
     try {
         const raw = localStorage.getItem(KEY);
         if (!raw) return null;
         const v = JSON.parse(raw) as Partial<SavedJazzCash>;
-        if (typeof v.mobile === 'string' && /^\d{10,11}$/.test(v.mobile) && typeof v.cnicLast6 === 'string' && /^\d{6}$/.test(v.cnicLast6)) {
+        if (typeof v.mobile === 'string' && MOBILE_RE.test(v.mobile) && typeof v.cnicLast6 === 'string' && CNIC_RE.test(v.cnicLast6)) {
             return { mobile: v.mobile, cnicLast6: v.cnicLast6 };
         }
     } catch {

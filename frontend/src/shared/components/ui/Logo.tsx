@@ -14,16 +14,16 @@ interface TalariaMarkProps {
     className?: string;
 }
 
-/** Talaria — Hermes' winged sandals: three feathers fanning up into a wing. The student app's mark. */
+/** Talaria — Hermes' winged sandals: three feathers of a wing, joined at the root. The student app's mark. */
 export const TalariaMark = ({ size = 40, tone = 'volt', className }: TalariaMarkProps) => {
     const tile = tone === 'dark' ? '#16133A' : '#C8F04A';
     const wing = tone === 'dark' ? '#C8F04A' : '#16133A';
     return (
         <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true" className={cn('shrink-0', className)}>
             <rect width="48" height="48" rx="13" fill={tile} />
-            <path d="M10 29 C 18 28.5, 27 23.5, 33 11" fill="none" stroke={wing} strokeWidth="3.4" strokeLinecap="round" />
-            <path d="M16 34 C 24 33.5, 31.5 29.5, 37 20.5" fill="none" stroke={wing} strokeWidth="3" strokeLinecap="round" />
-            <path d="M22.5 38.5 C 29 38, 34.5 35, 38 29.5" fill="none" stroke={wing} strokeWidth="2.6" strokeLinecap="round" />
+            <path d="M12 33 C 20 33, 30 28, 36 14" fill="none" stroke={wing} strokeWidth="4" strokeLinecap="round" />
+            <path d="M17 33 C 24 32, 31 29, 37 22" fill="none" stroke={wing} strokeWidth="3.2" strokeLinecap="round" />
+            <path d="M22 34 C 28 33, 33 31, 37 28" fill="none" stroke={wing} strokeWidth="2.6" strokeLinecap="round" />
         </svg>
     );
 };

@@ -47,15 +47,15 @@ type QuickSlotItem struct {
 }
 
 type CreateTripRequest struct {
-	RouteID                  uuid.UUID         `json:"route_id"`
-	DepartureTime            time.Time         `json:"departure_time"`
-	BookingOpenOffsetMinutes int32             `json:"booking_open_offset_minutes"`
-	BookingCloseOffsetMinutes int32            `json:"booking_close_offset_minutes"`
-	TotalCapacity            int               `json:"total_capacity"`
-	BasePrice                float64           `json:"base_price"`
-	BusType                  string            `json:"bus_type"`
-	Direction                string            `json:"direction"`
-	Stops                    []TripStopRequest `json:"stops"`
+	RouteID                   uuid.UUID         `json:"route_id"`
+	DepartureTime             time.Time         `json:"departure_time"`
+	BookingOpenOffsetMinutes  int32             `json:"booking_open_offset_minutes"`
+	BookingCloseOffsetMinutes int32             `json:"booking_close_offset_minutes"`
+	TotalCapacity             int               `json:"total_capacity"`
+	BasePrice                 float64           `json:"base_price"`
+	BusType                   string            `json:"bus_type"`
+	Direction                 string            `json:"direction"`
+	Stops                     []TripStopRequest `json:"stops"`
 }
 
 type TripStopRequest struct {
@@ -196,6 +196,22 @@ type QuotaUsage struct {
 	Limit     int `json:"limit"`
 	Used      int `json:"used"`
 	Remaining int `json:"remaining"`
+}
+
+type QuotaOverrideRequest struct {
+	UserIDs       []uuid.UUID `json:"user_ids"`
+	Direction     string      `json:"direction"`
+	WeekStart     string      `json:"week_start"`
+	ExpiresAt     time.Time   `json:"expires_at"`
+	ExtraBookings int         `json:"extra_bookings"`
+	Reason        string      `json:"reason"`
+}
+
+type QuotaOverrideResponse struct {
+	AffectedUsers int    `json:"affected_users"`
+	Direction     string `json:"direction"`
+	WeekStart     string `json:"week_start"`
+	ExpiresAt     string `json:"expires_at"`
 }
 
 type ActiveHoldResponse struct {

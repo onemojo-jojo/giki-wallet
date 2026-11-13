@@ -8,8 +8,8 @@ import (
 	"github.com/hash-walker/giki-wallet/internal/auth"
 	"github.com/hash-walker/giki-wallet/internal/common"
 	"github.com/hash-walker/giki-wallet/internal/config_management"
-	"github.com/hash-walker/giki-wallet/internal/middleware"
 	"github.com/hash-walker/giki-wallet/internal/feedback"
+	"github.com/hash-walker/giki-wallet/internal/middleware"
 	"github.com/hash-walker/giki-wallet/internal/payment"
 	"github.com/hash-walker/giki-wallet/internal/transport"
 	"github.com/hash-walker/giki-wallet/internal/user"
@@ -63,9 +63,9 @@ func (s *Server) MountRoutes() {
 	r := s.Router
 
 	// Global middleware stack (order matters!)
-	r.Use(middleware.RequestID)         // 1. Generate request ID
-	r.Use(middleware.Logger)            // 2. Log requests/responses
-	r.Use(middleware.ErrorHandler)      // 3. Recover from panics
+	r.Use(middleware.RequestID)    // 1. Generate request ID
+	r.Use(middleware.Logger)       // 2. Log requests/responses
+	r.Use(middleware.ErrorHandler) // 3. Recover from panics
 	// NOTE: All GIKI campus users share one NAT IP. Limits cover ALL users at once.
 	// 800 users x ~4 concurrent requests = ~3200 burst at peak.
 	r.Use(middleware.RateLimit(1000, 5000)) // 4. Global Rate Limit (1000 req/s, 5000 burst)
@@ -152,6 +152,11 @@ func (s *Server) MountRoutes() {
 		// Transport Revenue
 		r.Get("/transport/transactions", s.Transport.AdminGetRevenueTransactions)
 		r.Get("/transport/trips/export", s.Transport.HandleExportTrips)
+		r.Route("/transport/quota-overrides", func(r chi.Router) {
+			r.Use(auth.RequireRole(auth.RoleSuperAdmin, auth.RoleTransportAdmin))
+			r.Put("/", s.Transport.SetQuotaOverrides)
+			r.Delete("/", s.Transport.DeleteQuotaOverrides)
+		})
 
 		// Tickets Management
 		r.Get("/tickets", s.Transport.HandleAdminTickets)

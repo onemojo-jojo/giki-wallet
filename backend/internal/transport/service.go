@@ -117,15 +117,15 @@ func (s *Service) CreateTrip(ctx context.Context, req CreateTripRequest) (uuid.U
 
 		var createErr error
 		tripID, createErr = qtx.CreateTrip(ctx, transport_db.CreateTripParams{
-			RouteID:                  req.RouteID,
-			DepartureTime:            req.DepartureTime,
+			RouteID:                   req.RouteID,
+			DepartureTime:             req.DepartureTime,
 			BookingOpenOffsetMinutes:  req.BookingOpenOffsetMinutes,
 			BookingCloseOffsetMinutes: req.BookingCloseOffsetMinutes,
-			TotalCapacity:            int32(req.TotalCapacity),
-			AvailableSeats:           int32(req.TotalCapacity),
-			BasePrice:                basePrice,
-			BusType:                  req.BusType,
-			Direction:                req.Direction,
+			TotalCapacity:             int32(req.TotalCapacity),
+			AvailableSeats:            int32(req.TotalCapacity),
+			BasePrice:                 basePrice,
+			BusType:                   req.BusType,
+			Direction:                 req.Direction,
 		})
 
 		if createErr != nil {
@@ -175,13 +175,13 @@ func (s *Service) UpdateTrip(ctx context.Context, tripID uuid.UUID, req CreateTr
 	}
 
 	err = s.q.UpdateTrip(ctx, transport_db.UpdateTripParams{
-		ID:                       tripID,
-		DepartureTime:            req.DepartureTime,
+		ID:                        tripID,
+		DepartureTime:             req.DepartureTime,
 		BookingOpenOffsetMinutes:  req.BookingOpenOffsetMinutes,
 		BookingCloseOffsetMinutes: req.BookingCloseOffsetMinutes,
-		TotalCapacity:            int32(req.TotalCapacity),
-		BasePrice:                common.AmountToLowestUnit(req.BasePrice),
-		BusType:                  req.BusType,
+		TotalCapacity:             int32(req.TotalCapacity),
+		BasePrice:                 common.AmountToLowestUnit(req.BasePrice),
+		BusType:                   req.BusType,
 	})
 
 	if err != nil {
@@ -300,7 +300,11 @@ func (s *Service) HoldSeats(ctx context.Context, userID uuid.UUID, userRole stri
 			return commonerrors.Wrap(commonerrors.ErrDatabase, usageErr)
 		}
 
-		if (usage + int64(req.Count)) > int64(rule.WeeklyLimit) {
+		extraBookings, overrideErr := s.GetQuotaExtraBookings(ctx, userID, trip.Direction, trip.DepartureTime)
+		if overrideErr != nil {
+			return commonerrors.Wrap(commonerrors.ErrDatabase, overrideErr)
+		}
+		if (usage + int64(req.Count)) > int64(rule.WeeklyLimit)+int64(extraBookings) {
 			return ErrQuotaExceeded
 		}
 
@@ -586,10 +590,15 @@ func (s *Service) GetUserQuota(ctx context.Context, userID uuid.UUID, userRole s
 			return nil, commonerrors.Wrap(commonerrors.ErrDatabase, err)
 		}
 
+		extraBookings, err := s.GetQuotaExtraBookings(ctx, userID, dir, time.Now())
+		if err != nil {
+			return nil, commonerrors.Wrap(commonerrors.ErrDatabase, err)
+		}
+		limit := int(rule.WeeklyLimit) + extraBookings
 		quotaUsage := QuotaUsage{
-			Limit:     int(rule.WeeklyLimit),
+			Limit:     limit,
 			Used:      int(usage),
-			Remaining: int(rule.WeeklyLimit) - int(usage),
+			Remaining: limit - int(usage),
 		}
 
 		if dir == "OUTBOUND" {
@@ -600,6 +609,87 @@ func (s *Service) GetUserQuota(ctx context.Context, userID uuid.UUID, userRole s
 	}
 
 	return resp, nil
+}
+
+func (s *Service) GetQuotaExtraBookings(ctx context.Context, userID uuid.UUID, direction string, referenceTime time.Time) (int, error) {
+	local := referenceTime.In(s.loc)
+	daysSinceMonday := (int(local.Weekday()) + 6) % 7
+	weekStart := time.Date(local.Year(), local.Month(), local.Day()-daysSinceMonday, 0, 0, 0, 0, s.loc)
+	var extra int
+	err := s.dbPool.QueryRow(ctx, `
+		SELECT COALESCE(MAX(extra_bookings), 0)
+		FROM giki_transport.user_quota_overrides
+		WHERE user_id = $1 AND direction = $2 AND week_start = $3::date AND expires_at > NOW()
+	`, userID, direction, weekStart.Format("2006-01-02")).Scan(&extra)
+	return extra, err
+}
+
+func (s *Service) SetQuotaOverrides(ctx context.Context, actorID uuid.UUID, req QuotaOverrideRequest) (int, error) {
+	if len(req.UserIDs) == 0 || len(req.UserIDs) > 1000 || (req.Direction != "INBOUND" && req.Direction != "OUTBOUND") || req.ExtraBookings < 1 || req.ExtraBookings > 10 || !req.ExpiresAt.After(time.Now()) {
+		return 0, commonerrors.ErrInvalidInput
+	}
+	weekStart, err := time.ParseInLocation("2006-01-02", req.WeekStart, s.loc)
+	if err != nil || weekStart.Weekday() != time.Monday || weekStart.Format("2006-01-02") != req.WeekStart {
+		return 0, commonerrors.ErrInvalidInput
+	}
+	weekEnd := weekStart.AddDate(0, 0, 7)
+	if req.ExpiresAt.After(weekEnd) || !req.ExpiresAt.After(weekStart) {
+		return 0, commonerrors.ErrInvalidInput
+	}
+	seen := make(map[uuid.UUID]struct{}, len(req.UserIDs))
+	ids := make([]uuid.UUID, 0, len(req.UserIDs))
+	for _, id := range req.UserIDs {
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+	tx, err := s.dbPool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO giki_transport.user_quota_overrides
+			(user_id, direction, week_start, extra_bookings, expires_at, reason, granted_by)
+		SELECT u.id, $2, $3::date, $4, $5, $6, $7
+		FROM unnest($1::uuid[]) AS ids(id)
+		JOIN giki_wallet.users u ON u.id = ids.id AND u.user_type = 'STUDENT'
+		ON CONFLICT (user_id, direction, week_start) DO UPDATE SET
+			extra_bookings = EXCLUDED.extra_bookings,
+			expires_at = EXCLUDED.expires_at,
+			reason = EXCLUDED.reason,
+			granted_by = EXCLUDED.granted_by,
+			created_at = NOW()
+	`, ids, req.Direction, req.WeekStart, req.ExtraBookings, req.ExpiresAt, req.Reason, actorID)
+	if err != nil {
+		return 0, commonerrors.Wrap(commonerrors.ErrDatabase, err)
+	}
+	if int(tag.RowsAffected()) != len(ids) {
+		return 0, commonerrors.New(commonerrors.ErrInvalidInput.Code, commonerrors.ErrInvalidInput.StatusCode, "all user_ids must belong to active student accounts")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, commonerrors.Wrap(commonerrors.ErrDatabase, err)
+	}
+	return len(ids), nil
+}
+
+func (s *Service) DeleteQuotaOverrides(ctx context.Context, userIDs []uuid.UUID, direction, week string) (int64, error) {
+	if len(userIDs) == 0 || len(userIDs) > 1000 || (direction != "INBOUND" && direction != "OUTBOUND") {
+		return 0, commonerrors.ErrInvalidInput
+	}
+	weekStart, err := time.ParseInLocation("2006-01-02", week, s.loc)
+	if err != nil || weekStart.Weekday() != time.Monday || weekStart.Format("2006-01-02") != week {
+		return 0, commonerrors.ErrInvalidInput
+	}
+	tag, err := s.dbPool.Exec(ctx, `
+		DELETE FROM giki_transport.user_quota_overrides
+		WHERE user_id = ANY($1::uuid[]) AND direction = $2 AND week_start = $3::date
+	`, userIDs, direction, week)
+	if err != nil {
+		return 0, commonerrors.Wrap(commonerrors.ErrDatabase, err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (s *Service) GetActiveHolds(ctx context.Context, userID uuid.UUID) ([]ActiveHoldResponse, error) {

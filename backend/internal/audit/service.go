@@ -35,10 +35,11 @@ const (
 	ActionAdminDeleteUser = "ADMIN_DELETE_USER"
 	ActionAdminUpdateUser = "ADMIN_UPDATE_USER"
 
-	ActionAdminCreateTrip = "ADMIN_CREATE_TRIP"
-	ActionAdminUpdateTrip = "ADMIN_UPDATE_TRIP"
-	ActionAdminDeleteTrip = "ADMIN_DELETE_TRIP"
-	ActionAdminCancelTrip = "ADMIN_CANCEL_TRIP"
+	ActionAdminCreateTrip          = "ADMIN_CREATE_TRIP"
+	ActionAdminUpdateTrip          = "ADMIN_UPDATE_TRIP"
+	ActionAdminDeleteTrip          = "ADMIN_DELETE_TRIP"
+	ActionAdminCancelTrip          = "ADMIN_CANCEL_TRIP"
+	ActionAdminUpdateQuotaOverride = "ADMIN_UPDATE_QUOTA_OVERRIDE"
 )
 
 // Security Statuses

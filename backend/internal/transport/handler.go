@@ -298,6 +298,54 @@ func (h *Handler) GetQuota(w http.ResponseWriter, r *http.Request) {
 	common.ResponseWithJSON(w, http.StatusOK, resp, requestID)
 }
 
+func (h *Handler) SetQuotaOverrides(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetRequestID(r.Context())
+	actorID, ok := auth.GetUserIDFromContext(r.Context())
+	if !ok {
+		middleware.HandleError(w, commonerrors.ErrUnauthorized, requestID)
+		return
+	}
+	var req QuotaOverrideRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		middleware.HandleError(w, commonerrors.Wrap(commonerrors.ErrInvalidJSON, err), requestID)
+		return
+	}
+	affected, err := h.service.SetQuotaOverrides(r.Context(), actorID, req)
+	if err != nil {
+		middleware.HandleError(w, err, requestID)
+		return
+	}
+	h.logAdminAction(r.Context(), r, audit.ActionAdminUpdateQuotaOverride, nil, map[string]interface{}{
+		"affected_users": affected, "direction": req.Direction, "week_start": req.WeekStart,
+		"expires_at": req.ExpiresAt, "extra_bookings": req.ExtraBookings, "reason": req.Reason,
+	})
+	common.ResponseWithJSON(w, http.StatusOK, QuotaOverrideResponse{
+		AffectedUsers: affected, Direction: req.Direction, WeekStart: req.WeekStart, ExpiresAt: req.ExpiresAt.Format(time.RFC3339),
+	}, requestID)
+}
+
+func (h *Handler) DeleteQuotaOverrides(w http.ResponseWriter, r *http.Request) {
+	requestID := middleware.GetRequestID(r.Context())
+	var req struct {
+		UserIDs   []uuid.UUID `json:"user_ids"`
+		Direction string      `json:"direction"`
+		WeekStart string      `json:"week_start"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		middleware.HandleError(w, commonerrors.Wrap(commonerrors.ErrInvalidJSON, err), requestID)
+		return
+	}
+	affected, err := h.service.DeleteQuotaOverrides(r.Context(), req.UserIDs, req.Direction, req.WeekStart)
+	if err != nil {
+		middleware.HandleError(w, err, requestID)
+		return
+	}
+	h.logAdminAction(r.Context(), r, audit.ActionAdminUpdateQuotaOverride, nil, map[string]interface{}{
+		"affected_users": affected, "direction": req.Direction, "week_start": req.WeekStart, "revoked": true,
+	})
+	common.ResponseWithJSON(w, http.StatusOK, map[string]int64{"revoked": affected}, requestID)
+}
+
 func (h *Handler) GetActiveHolds(w http.ResponseWriter, r *http.Request) {
 	requestID := middleware.GetRequestID(r.Context())
 	userID, ok := auth.GetUserIDFromContext(r.Context())

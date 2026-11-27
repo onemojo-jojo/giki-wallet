@@ -59,7 +59,7 @@ func main() {
 		log.Fatalf("Unable to parse database connection string: %v", err)
 	}
 
-	dbConfig.MaxConns = 60
+	dbConfig.MaxConns = 80
 	dbConfig.MinConns = 10
 	dbConfig.MaxConnLifetime = 1 * time.Hour
 	dbConfig.MaxConnIdleTime = 30 * time.Minute

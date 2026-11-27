@@ -300,7 +300,7 @@ func (s *Service) HoldSeats(ctx context.Context, userID uuid.UUID, userRole stri
 			return commonerrors.Wrap(commonerrors.ErrDatabase, usageErr)
 		}
 
-		extraBookings, overrideErr := s.GetQuotaExtraBookings(ctx, userID, trip.Direction, trip.DepartureTime)
+		extraBookings, overrideErr := s.GetQuotaExtraBookings(ctx, tx, userID, trip.Direction, trip.DepartureTime)
 		if overrideErr != nil {
 			return commonerrors.Wrap(commonerrors.ErrDatabase, overrideErr)
 		}
@@ -590,7 +590,7 @@ func (s *Service) GetUserQuota(ctx context.Context, userID uuid.UUID, userRole s
 			return nil, commonerrors.Wrap(commonerrors.ErrDatabase, err)
 		}
 
-		extraBookings, err := s.GetQuotaExtraBookings(ctx, userID, dir, time.Now())
+		extraBookings, err := s.GetQuotaExtraBookings(ctx, s.dbPool, userID, dir, time.Now())
 		if err != nil {
 			return nil, commonerrors.Wrap(commonerrors.ErrDatabase, err)
 		}
@@ -611,15 +611,15 @@ func (s *Service) GetUserQuota(ctx context.Context, userID uuid.UUID, userRole s
 	return resp, nil
 }
 
-func (s *Service) GetQuotaExtraBookings(ctx context.Context, userID uuid.UUID, direction string, referenceTime time.Time) (int, error) {
+func (s *Service) GetQuotaExtraBookings(ctx context.Context, db transport_db.DBTX, userID uuid.UUID, direction string, referenceTime time.Time) (int, error) {
 	local := referenceTime.In(s.loc)
 	daysSinceMonday := (int(local.Weekday()) + 6) % 7
 	weekStart := time.Date(local.Year(), local.Month(), local.Day()-daysSinceMonday, 0, 0, 0, 0, s.loc)
 	var extra int
-	err := s.dbPool.QueryRow(ctx, `
+	err := db.QueryRow(ctx, `
 		SELECT COALESCE(MAX(extra_bookings), 0)
 		FROM giki_transport.user_quota_overrides
-		WHERE user_id = $1 AND direction = $2 AND week_start = $3::date AND expires_at > NOW()
+		WHERE user_id = $1 AND direction = $2 AND week_start = $3::date AND expires_at > statement_timestamp()
 	`, userID, direction, weekStart.Format("2006-01-02")).Scan(&extra)
 	return extra, err
 }

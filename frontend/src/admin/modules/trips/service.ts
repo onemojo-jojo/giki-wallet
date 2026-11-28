@@ -27,12 +27,6 @@ export const TripService = {
         await apiClient.delete(`/admin/trips/${tripId}`);
     },
 
-    getAllUpcomingTrips: async (): Promise<TripResponse[]> => {
-        // Backend: r.Get("/trips/upcoming", s.Transport.GetAllUpcomingTrips) under /transport
-        const { data } = await apiClient.get<TripResponse[]>('/transport/trips/upcoming');
-        return data;
-    },
-
     getAllTrips: async (startDate?: Date, endDate?: Date): Promise<TripResponse[]> => {
         const params = new URLSearchParams();
         if (startDate) params.append('start_date', startDate.toISOString());

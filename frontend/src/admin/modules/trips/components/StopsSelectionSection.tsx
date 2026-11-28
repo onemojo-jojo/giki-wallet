@@ -5,13 +5,14 @@ import { StopItem } from '../types';
 
 interface StopsSelectionSectionProps {
     stops: StopItem[];
+    disabled?: boolean;
 }
 
-export const StopsSelectionSection = ({ stops }: StopsSelectionSectionProps) => {
+export const StopsSelectionSection = ({ stops, disabled }: StopsSelectionSectionProps) => {
     const { control, formState: { errors } } = useFormContext<CreateTripFormValues>();
 
     return (
-        <div className="border rounded-md p-4 mt-4 bg-gray-50">
+        <div className={disabled ? "border rounded-md p-4 mt-4 bg-gray-50 opacity-90" : "border rounded-md p-4 mt-4 bg-gray-50"}>
             <h4 className="font-medium mb-3 flex items-center gap-2 text-sm text-gray-900">
                 <ArrowRight className="h-4 w-4" />
                 Stops Selection
@@ -30,8 +31,9 @@ export const StopsSelectionSection = ({ stops }: StopsSelectionSectionProps) => 
                                 >
                                     <input
                                         type="checkbox"
-                                        className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                        className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary disabled:cursor-not-allowed"
                                         checked={field.value?.includes(item.stop_id)}
+                                        disabled={disabled}
                                         onChange={(e) => {
                                             const checked = e.target.checked;
                                             const current = field.value || [];

@@ -6,6 +6,22 @@ import { TransactionCard } from './TransactionCard';
 import { useWalletModuleStore } from '../store';
 import { ApiTransaction } from '../api';
 
+const KARACHI_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Karachi',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+});
+
+/** Calendar date (YYYY-MM-DD) in Asia/Karachi for grouping. */
+function transactionDateInKarachi(createdAt: string): string {
+    const parts = KARACHI_DATE_FORMATTER.formatToParts(new Date(createdAt));
+    const year = parts.find((p) => p.type === 'year')?.value;
+    const month = parts.find((p) => p.type === 'month')?.value;
+    const day = parts.find((p) => p.type === 'day')?.value;
+    return `${year}-${month}-${day}`;
+}
+
 interface TransactionHistoryProps {
     isOpen: boolean;
     onClose: () => void;
@@ -26,14 +42,13 @@ export const TransactionHistory = ({
     // Map ApiTransaction to Transaction UI model
     const mappedTransactions: Transaction[] = useMemo(() => {
         return transactions.map((t: ApiTransaction) => {
-            const dateObj = new Date(t.created_at);
             return {
                 id: t.id,
                 type: mapTxType(t.type),
                 description: t.description,
                 amount: t.amount,
                 timestamp: formatTime(t.created_at),
-                date: dateObj.toISOString().split('T')[0],
+                date: transactionDateInKarachi(t.created_at),
                 referenceId: t.reference_id
             };
         });

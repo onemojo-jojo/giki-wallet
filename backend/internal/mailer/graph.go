@@ -8,12 +8,17 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 //go:embed templates/*.html
 var templateFS embed.FS
+
+// tokenExpiryMargin is how long before expires_in a cached token stops being used.
+const tokenExpiryMargin = 60 * time.Second
 
 type GraphSender struct {
 	ClientID     string
@@ -21,6 +26,10 @@ type GraphSender struct {
 	ClientSecret string
 	SenderEmail  string
 	httpClient   *http.Client
+
+	mu          sync.Mutex
+	cachedToken string
+	tokenExpiry time.Time
 }
 
 func NewGraphSender(clientID, tenantID, clientSecret, senderEmail string) *GraphSender {
@@ -119,19 +128,28 @@ func (g *GraphSender) Send(to, subject, htmlBody string) error {
 	return nil
 }
 
-// getAccessToken fetches a fresh token.
-// Note: In production, you should wrap this in a cached struct that checks expiration.
+// getAccessToken returns a cached token while one is still valid, and otherwise
+// fetches a fresh one.
 func (g *GraphSender) getAccessToken() (string, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 
-	url := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", g.TenantID)
+	if g.cachedToken != "" && time.Now().Before(g.tokenExpiry) {
+		return g.cachedToken, nil
+	}
 
-	// Prepare Form Data
-	data := fmt.Sprintf(
-		"grant_type=client_credentials&client_id=%s&client_secret=%s&scope=https://graph.microsoft.com/.default",
-		g.ClientID, g.ClientSecret,
-	)
+	tokenURL := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", g.TenantID)
 
-	req, err := http.NewRequest("POST", url, strings.NewReader(data))
+	// Prepare Form Data (Encode URL-escapes every value, so secrets containing
+	// '+', '&' or '%' reach Azure unchanged)
+	data := url.Values{
+		"grant_type":    {"client_credentials"},
+		"client_id":     {g.ClientID},
+		"client_secret": {g.ClientSecret},
+		"scope":         {"https://graph.microsoft.com/.default"},
+	}.Encode()
+
+	req, err := http.NewRequest("POST", tokenURL, strings.NewReader(data))
 	if err != nil {
 		return "", err
 	}
@@ -156,6 +174,9 @@ func (g *GraphSender) getAccessToken() (string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", err
 	}
+
+	g.cachedToken = result.AccessToken
+	g.tokenExpiry = time.Now().Add(time.Duration(result.ExpiresIn)*time.Second - tokenExpiryMargin)
 
 	return result.AccessToken, nil
 }

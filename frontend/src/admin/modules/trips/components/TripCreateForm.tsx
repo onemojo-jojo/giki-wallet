@@ -174,7 +174,7 @@ export const TripCreateForm = ({ onSuccess }: { onSuccess?: () => void }) => {
 
     const watchedCapacity = watch('totalCapacity');
     const soldTickets = editingTrip ? (editingTrip.total_capacity - editingTrip.available_seats) : 0;
-    const hasBookings = soldTickets > 0;
+    const isEditMode = !!editingTrip;
 
     const handleRouteChange = async (routeId: string) => {
         await selectRoute(routeId);
@@ -249,6 +249,16 @@ export const TripCreateForm = ({ onSuccess }: { onSuccess?: () => void }) => {
         <FormProvider {...methods}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-4xl mx-auto p-6 bg-white border rounded-xl shadow-sm">
 
+                {isEditMode && (
+                    <div
+                        className="bg-amber-50 p-3 rounded-md border border-amber-200 text-sm text-amber-900"
+                        role="note"
+                    >
+                        <span className="font-semibold">Route, direction, and stops are fixed for this trip.</span>{' '}
+                        To change them, cancel and create a new trip instead.
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* --- LEFT COLUMN: Route & Schedule --- */}
                     <div className="space-y-6">
@@ -257,13 +267,8 @@ export const TripCreateForm = ({ onSuccess }: { onSuccess?: () => void }) => {
                             isLoadingRoutes={isLoadingRoutes}
                             quickSlots={template?.quick_slots}
                             onRouteSelect={handleRouteChange}
-                            disabled={hasBookings && !!editingTrip} // Lock route if bookings exist
+                            disabled={isEditMode}
                         />
-                        {hasBookings && !!editingTrip && (
-                            <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 text-xs text-yellow-800 flex items-start">
-                                <span className="font-bold mr-1">Note:</span> Route cannot be changed because tickets have already been sold.
-                            </div>
-                        )}
                     </div>
 
                     {/* --- RIGHT COLUMN: Booking Window, Capacity & Stops --- */}
@@ -301,7 +306,7 @@ export const TripCreateForm = ({ onSuccess }: { onSuccess?: () => void }) => {
                                         </p>
                                     )}
                                 </div>
-                                <StopsSelectionSection stops={template.stops} />
+                                <StopsSelectionSection stops={template.stops} disabled={isEditMode} />
                             </>
                         )}
                     </div>

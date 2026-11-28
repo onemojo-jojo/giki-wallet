@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, TableWrapper, getWeekStart, getWeekEnd } from '../../../shared';
 import { Input } from '@/shared/components/ui/Input';
 import { Select } from '@/shared/components/ui/Select';
@@ -24,8 +24,8 @@ export const TicketsHistory = ({ selectedWeek }: TicketsHistoryProps) => {
 
     const debouncedSearch = useDebounce(searchTerm, 500);
 
-    const weekStart = getWeekStart(selectedWeek);
-    const weekEnd = getWeekEnd(selectedWeek);
+    const weekStart = useMemo(() => getWeekStart(selectedWeek), [selectedWeek]);
+    const weekEnd = useMemo(() => getWeekEnd(selectedWeek), [selectedWeek]);
 
     const fetchTickets = useCallback(async () => {
         setIsLoading(true);

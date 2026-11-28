@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef, useMemo } from 'react';
-import { useWalletModuleStore, PaymentFlowStatus } from '../store';
+import { useWalletModuleStore } from '../store';
 import { topUp, getTransactionStatus } from '../api';
 import { getErrorMessage } from '@/lib/errors';
 import { TopUpRequest } from '../types';
@@ -104,6 +104,20 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
         pollTimeoutRef.current = setTimeout(tick, 1000);
     }, [pollOnce]);
 
+    const startCountdown = useCallback(() => {
+        if (timerIntervalRef.current) return;
+
+        timerIntervalRef.current = setInterval(() => {
+            setTimeLeft((prev: number) => {
+                if (prev <= 1) {
+                    handleFailure("Payment timed out. Please try again.");
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    }, [setTimeLeft, handleFailure]);
+
     const initiatePayment = async () => {
         if (isActive.current) return;
 
@@ -116,17 +130,7 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
         setStatus('processing');
 
         setTimeLeft(JAZZCASH_PAYMENT_TIMEOUT_SECONDS);
-
-        // Start countdown immediately
-        timerIntervalRef.current = setInterval(() => {
-            setTimeLeft((prev: number) => {
-                if (prev <= 1) {
-                    handleFailure("Payment timed out. Please try again.");
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
+        startCountdown();
 
         try {
             const request: TopUpRequest = {
@@ -163,16 +167,28 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
         }
     };
 
+    // Resume in-flight payment after route remount (timers are local; store survives navigation).
+    useEffect(() => {
+        const { status: currentStatus, txnRefNo: currentTxnRefNo } = useWalletModuleStore.getState();
+        if (currentStatus === 'processing' && currentTxnRefNo) {
+            startPolling();
+            startCountdown();
+        }
+        // processing without txnRefNo: possible if topUp was aborted before PENDING; no client API to
+        // recover txn ref without calling topUp again — leave state unchanged (see issue #51).
+    }, [startPolling, startCountdown]);
+
     // Auto-Wake on visibility change
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && status === 'processing') {
                 startPolling();
+                startCountdown();
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [status, startPolling]);
+    }, [status, startPolling, startCountdown]);
 
     useEffect(() => {
         return () => clearAllTimers();

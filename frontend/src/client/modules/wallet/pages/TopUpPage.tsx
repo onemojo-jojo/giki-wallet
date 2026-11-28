@@ -20,6 +20,15 @@ const TopUpPage = () => {
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(false);
     const [maxLimit, setMaxLimit] = useState<number>(800); // Default fallback
+    const [isJazzCashReady, setIsJazzCashReady] = useState(false);
+
+    useEffect(() => {
+        const { status, resetPaymentState } = useWalletModuleStore.getState();
+        if (status === 'success' || status === 'failed') {
+            resetPaymentState();
+        }
+        setIsJazzCashReady(true);
+    }, []);
 
     useEffect(() => {
         const fetchLimit = async () => {
@@ -48,9 +57,12 @@ const TopUpPage = () => {
         fetchBalance();
     }, [fetchBalance]);
 
-    // Initialize form data on page load
+    // Fresh form on entry unless resuming an in-flight JazzCash payment (amount/mobile/CNIC + idempotency key).
     useEffect(() => {
-        resetFormData();
+        const { status } = useWalletModuleStore.getState();
+        if (status !== 'processing') {
+            resetFormData();
+        }
     }, [resetFormData]);
 
     // Scroll to top on page load (fixes mobile auto-scroll issue)
@@ -164,13 +176,15 @@ const TopUpPage = () => {
 
                 {/* Payment Content */}
                 {formData.method === 'MWALLET' ? (
-                    <JazzCashPayment
-                        amount={parseFloat(formData.amount) || 0}
-                        phoneNumber={formData.mobile_number}
-                        cnicLast6={formData.cnic_last_six}
-                        maxLimit={maxLimit}
-                        currentBalance={balance}
-                    />
+                    isJazzCashReady ? (
+                        <JazzCashPayment
+                            amount={parseFloat(formData.amount) || 0}
+                            phoneNumber={formData.mobile_number}
+                            cnicLast6={formData.cnic_last_six}
+                            maxLimit={maxLimit}
+                            currentBalance={balance}
+                        />
+                    ) : null
                 ) : (
                     <Button
                         onClick={handleCardPayment}

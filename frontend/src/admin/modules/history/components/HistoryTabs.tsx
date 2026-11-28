@@ -1,7 +1,7 @@
-import { Bus, Ticket, Receipt } from 'lucide-react';
+import { Ticket, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type HistoryTab = 'routes' | 'tickets' | 'transactions';
+export type HistoryTab = 'tickets' | 'transactions';
 
 interface HistoryTabsProps {
     activeTab: HistoryTab;
@@ -10,7 +10,6 @@ interface HistoryTabsProps {
 
 export const HistoryTabs = ({ activeTab, onTabChange }: HistoryTabsProps) => {
     const tabs: Array<{ id: HistoryTab; label: string; icon: React.ReactNode }> = [
-        { id: 'routes', label: 'Routes', icon: <Bus className="w-4 h-4" /> },
         { id: 'tickets', label: 'Tickets', icon: <Ticket className="w-4 h-4" /> },
         { id: 'transactions', label: 'Transactions', icon: <Receipt className="w-4 h-4" /> },
     ];

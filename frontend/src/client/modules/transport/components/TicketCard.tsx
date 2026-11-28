@@ -16,7 +16,11 @@ export const TicketCard = ({ ticket }: TicketCardProps) => {
     const [isCancelling, setIsCancelling] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
 
-    const isCancelled = ticket.status === 'CANCELLED';
+    const isCancelled = ticket.status.startsWith('CANCELLED');
+    const isAdminCancelled = ticket.status === 'CANCELLED_BY_ADMIN';
+    const statusLabel = isAdminCancelled
+        ? 'Cancelled by the transport office'
+        : ticket.status;
     const isSelf = ticket.is_self;
     const canCancel = !isCancelled && ticket.is_cancellable;
 
@@ -112,10 +116,11 @@ export const TicketCard = ({ ticket }: TicketCardProps) => {
                             )}>
                                 <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", isCancelled ? "bg-red-500" : "bg-accent animate-pulse")} />
                                 <span className={cn(
-                                    "text-[10px] font-black uppercase tracking-widest",
-                                    isCancelled ? "text-red-500" : "text-slate-500"
+                                    "text-[10px] font-black tracking-widest",
+                                    isCancelled ? "text-red-500" : "text-slate-500",
+                                    !isAdminCancelled && "uppercase"
                                 )}>
-                                    {ticket.status}
+                                    {statusLabel}
                                 </span>
                             </div>
                         </div>

@@ -29,7 +29,7 @@ export const TicketsPage = () => {
         myTickets.forEach(ticket => {
             const departure = new Date(ticket.departure_time);
 
-            if (ticket.status === 'CANCELLED' || departure < cutoff) {
+            if (ticket.status.startsWith('CANCELLED') || departure < cutoff) {
                 return;
             }
             list.push(ticket);

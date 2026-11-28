@@ -24,7 +24,7 @@ export default function BookingConfirmationPage() {
             }));
 
             await confirmBooking(confirmations);
-            navigate('/transport/tickets');
+            navigate('/tickets');
         } catch (e) {
             setSubmitting(false);
         }

@@ -37,7 +37,7 @@ export const PassengerDetailsPage = () => {
         ({ currentLocation, nextLocation }) =>
             activeHolds.length > 0 &&
             currentLocation.pathname !== nextLocation.pathname &&
-            nextLocation.pathname !== '/transport/tickets'
+            nextLocation.pathname !== '/tickets'
     );
 
     // Redirect if no holds
@@ -99,7 +99,7 @@ export const PassengerDetailsPage = () => {
             }));
             await confirmBooking(confirmations);
             setShowConfirmModal(false);
-            navigate('/transport/tickets');
+            navigate('/tickets');
         } catch (error) {
             console.error('Failed to confirm booking:', error);
         } finally {

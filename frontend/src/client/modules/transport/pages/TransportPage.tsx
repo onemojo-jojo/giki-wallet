@@ -154,7 +154,7 @@ export const TransportPage = () => {
             }));
             await confirmBooking(confirmations);
             setShowConfirmModal(false);
-            navigate('/transport/tickets');
+            navigate('/tickets');
         } catch (error) {
             console.error('Failed to confirm booking:', error);
         } finally {

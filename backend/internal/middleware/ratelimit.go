@@ -16,9 +16,9 @@ func RateLimit(limit float64, burst int) func(http.Handler) http.Handler {
 	lmt.SetIPLookups([]string{"X-Forwarded-For", "X-Real-IP", "RemoteAddr"})
 
 	lmt.SetBurst(burst)
+	lmt.SetOverrideDefaultResponseWriter(true)
 
 	lmt.SetOnLimitReached(func(w http.ResponseWriter, r *http.Request) {
-
 		requestID := GetRequestID(r.Context())
 		HandleError(w, errors.ErrRateLimitExceeded, requestID)
 	})
@@ -27,6 +27,7 @@ func RateLimit(limit float64, burst int) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			httpError := tollbooth.LimitByRequest(lmt, w, r)
 			if httpError != nil {
+				lmt.ExecOnLimitReached(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)

@@ -2,6 +2,7 @@ import React from 'react';
 import { Phone, CheckCircle2, XCircle, Loader2, Smartphone, ShieldCheck, Clock } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { JAZZCASH_PAYMENT_TIMEOUT_SECONDS, useJazzCashPayment } from '../hooks/useJazzCashPayment';
+import type { PaymentFlowStatus } from '../store';
 
 interface JazzCashPaymentProps {
     amount: number;
@@ -37,13 +38,18 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({
         cnicLast6
     );
 
-    // Sync with parent callbacks
+    // Notify only on transitions (avoids duplicate toast after navigating back with stale store state).
+    const prevStatusRef = React.useRef<PaymentFlowStatus | undefined>(undefined);
     React.useEffect(() => {
-        if (status === 'success') {
+        const prev = prevStatusRef.current;
+        if (status === 'success' && prev === 'processing') {
             toast.success(`G-Bux ${amount.toLocaleString()} added to wallet!`);
-            if (onSuccess) onSuccess();
+            onSuccess?.();
         }
-        if (status === 'failed' && onFailure) onFailure(errorMessage || 'Unknown error');
+        if (status === 'failed' && prev === 'processing') {
+            onFailure?.(errorMessage || 'Unknown error');
+        }
+        prevStatusRef.current = status;
     }, [status, onSuccess, onFailure, errorMessage, amount]);
 
     if (status === 'success') {

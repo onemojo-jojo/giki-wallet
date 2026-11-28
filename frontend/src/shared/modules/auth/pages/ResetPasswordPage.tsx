@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/Input';
 import { toast } from '@/lib/toast';
+import { getErrorMessage } from '@/lib/errors';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { resetPasswordSchema, type ResetPasswordFormData } from '../validators';
@@ -37,8 +38,8 @@ export const ResetPasswordPage = () => {
             });
             toast.success('Password reset successfully');
             navigate('/auth/sign-in', { replace: true });
-        } catch (e: any) {
-            toast.error(e.response?.data?.message || 'Failed to reset password');
+        } catch (e: unknown) {
+            toast.error(getErrorMessage(e) || 'Failed to reset password');
         } finally {
             setIsLoading(false);
         }

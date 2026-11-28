@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Route, RouteTemplateResponse, TripResponse } from './types';
 import { TripService } from './service';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errors';
 
 interface TripCreateState {
     // Data
@@ -116,10 +117,9 @@ export const useTripCreateStore = create<TripCreateState>((set, get) => ({
             toast.success("Trip created successfully!");
             get().fetchTrips(); // Refresh list after creation
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            const message = error.response?.data?.message || "Failed to create trip";
-            toast.error(message);
+            toast.error(getErrorMessage(error) || "Failed to create trip");
             return false;
         } finally {
             set({ isSubmitting: false });
@@ -133,10 +133,9 @@ export const useTripCreateStore = create<TripCreateState>((set, get) => ({
             toast.success("Trip updated successfully!");
             get().fetchTrips(); // Refresh list after update
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            const message = error.response?.data?.message || "Failed to update trip";
-            toast.error(message);
+            toast.error(getErrorMessage(error) || "Failed to update trip");
             return false;
         } finally {
             set({ isSubmitting: false });
@@ -150,10 +149,9 @@ export const useTripCreateStore = create<TripCreateState>((set, get) => ({
             toast.success("Trip deleted successfully!");
             get().fetchTrips(); // Refresh list after deletion
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            const message = error.response?.data?.message || "Failed to delete trip";
-            toast.error(message);
+            toast.error(getErrorMessage(error) || "Failed to delete trip");
             return false;
         } finally {
             set({ isDeletingTrip: false });
@@ -166,10 +164,9 @@ export const useTripCreateStore = create<TripCreateState>((set, get) => ({
             toast.success("Trip status updated!");
             get().fetchTrips(); // Refresh list
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            const message = error.response?.data?.message || "Failed to update trip status";
-            toast.error(message);
+            toast.error(getErrorMessage(error) || "Failed to update trip status");
             return false;
         }
     },
@@ -180,10 +177,9 @@ export const useTripCreateStore = create<TripCreateState>((set, get) => ({
             toast.success(`${tripIds.length} trip(s) updated!`);
             get().fetchTrips(); // Refresh list
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            const message = error.response?.data?.message || "Failed to update trips";
-            toast.error(message);
+            toast.error(getErrorMessage(error) || "Failed to update trips");
             return false;
         }
     },
@@ -194,10 +190,9 @@ export const useTripCreateStore = create<TripCreateState>((set, get) => ({
             toast.success("Trip cancelled and refunds processed!");
             get().fetchTrips(); // Refresh list
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            const message = error.response?.data?.message || "Failed to cancel trip";
-            toast.error(message);
+            toast.error(getErrorMessage(error) || "Failed to cancel trip");
             return false;
         }
     },

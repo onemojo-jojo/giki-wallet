@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/Input';
 import { toast } from '@/lib/toast';
+import { getErrorMessage } from '@/lib/errors';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { forgotPasswordSchema, type ForgotPasswordFormData } from '../validators';
@@ -27,8 +28,8 @@ export const ForgotPasswordPage = () => {
             await requestPasswordReset(data.email.trim());
             setIsEmailSent(true);
             toast.success('Reset link sent to your email');
-        } catch (e: any) {
-            toast.error(e.response?.data?.message || 'Failed to send reset link');
+        } catch (e: unknown) {
+            toast.error(getErrorMessage(e) || 'Failed to send reset link');
         } finally {
             setIsLoading(false);
         }

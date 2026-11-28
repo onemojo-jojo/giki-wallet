@@ -10,7 +10,6 @@ const JAZZCASH_URGENT_PHASE_SECONDS = 60;
 export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast6: string) => {
 
     const {
-        formData,
         status,
         timeLeft,
         txnRefNo,
@@ -129,12 +128,13 @@ export const useJazzCashPayment = (amount: number, phoneNumber: string, cnicLast
         }, 1000);
 
         try {
+            const current = useWalletModuleStore.getState().formData;
             const request: TopUpRequest = {
-                idempotency_key: formData.idempotency_key,
-                amount: parseFloat(formData.amount),
-                method: formData.method,
-                phone_number: formData.mobile_number,
-                cnic_last6: formData.cnic_last_six
+                idempotency_key: current.idempotency_key,
+                amount: parseFloat(current.amount),
+                method: current.method,
+                phone_number: current.mobile_number,
+                cnic_last6: current.cnic_last_six
             };
 
             // This awaits the initial API response (the "res" you mentioned)

@@ -2,6 +2,7 @@ import React from 'react';
 import { Phone, CheckCircle2, XCircle, Loader2, Smartphone, ShieldCheck, Clock } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { JAZZCASH_PAYMENT_TIMEOUT_SECONDS, useJazzCashPayment } from '../hooks/useJazzCashPayment';
+import { useWalletModuleStore } from '../store';
 
 interface JazzCashPaymentProps {
     amount: number;
@@ -36,6 +37,7 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({
         phoneNumber,
         cnicLast6
     );
+    const renewIdempotencyKey = useWalletModuleStore((s) => s.renewIdempotencyKey);
 
     // Sync with parent callbacks
     React.useEffect(() => {
@@ -73,7 +75,10 @@ const JazzCashPayment: React.FC<JazzCashPaymentProps> = ({
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Failed</h2>
                 <p className="text-gray-500 mb-6 font-medium px-4">{errorMessage || 'Something went wrong.'}</p>
                 <button
-                    onClick={reset}
+                    onClick={() => {
+                        renewIdempotencyKey();
+                        reset();
+                    }}
                     className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-2xl transition-all"
                 >
                     Try Again

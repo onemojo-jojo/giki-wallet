@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,14 +19,20 @@ func TestGetQuotaExtraBookingsPostgreSQL(t *testing.T) {
 	loc := mustKarachi(t)
 	svc := &Service{loc: loc}
 	ctx := context.Background()
-	userID := uuid.New()
+	token := strings.ReplaceAll(uuid.New().String(), "-", "")
+	userID := insertTestUser(t, ctx, pool,
+		"Quota Extra Test",
+		"quota-extra-"+token+"@example.test",
+		token[:20],
+	)
 	reference := time.Date(2024, 1, 3, 9, 0, 0, 0, loc)
 	const weekStart = "2024-01-01"
 
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_, err := pool.Exec(cleanupCtx, `DELETE FROM giki_transport.user_quota_overrides WHERE user_id = $1`, userID)
+		// user_quota_overrides.user_id references users(id) ON DELETE CASCADE.
+		_, err := pool.Exec(cleanupCtx, `DELETE FROM giki_wallet.users WHERE id = $1`, userID)
 		require.NoError(t, err)
 	})
 
@@ -112,6 +119,19 @@ func openQuotaTestPool(t *testing.T) *pgxpool.Pool {
 	defer cancel()
 	require.NoError(t, pool.Ping(ctx))
 	return pool
+}
+
+func insertTestUser(t *testing.T, ctx context.Context, db transport_db.DBTX, name, email, phone string) uuid.UUID {
+	t.Helper()
+	var id uuid.UUID
+	err := db.QueryRow(ctx, `
+		INSERT INTO giki_wallet.users (name, email, phone_number, password_hash, user_type)
+		VALUES ($1, $2, $3, 'test-hash', 'STUDENT')
+		RETURNING id
+	`, name, email, phone).Scan(&id)
+	require.NoError(t, err)
+	require.NotEqual(t, uuid.Nil, id)
+	return id
 }
 
 func insertOverride(t *testing.T, ctx context.Context, db transport_db.DBTX, userID uuid.UUID, direction, weekStart, expiresIn string, extra int) {
